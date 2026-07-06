@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Browser Automation Agent{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Start a new run</h2>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form class="trigger-form" method="post" action="/run" id="trigger-form">
+    <label for="goal">Goal</label>
+    <input type="text" id="goal" name="goal" placeholder="e.g. collect all humor-tagged quotes" required />
+    <label for="start_url">Start URL</label>
+    <input type="text" id="start_url" name="start_url" placeholder="https://example.com" required />
+    <button type="submit">Start Run</button>
+  </form>
+
+  <div class="preset-buttons">
+    <h3>Preset tasks</h3>
+    {% for preset in presets %}
+    <button type="button"
+            class="preset-btn"
+            data-goal="{{ preset.goal }}"
+            data-start-url="{{ preset.start_url }}">
+      {{ preset.label }}
+    </button>
+    {% endfor %}
+  </div>
+</section>
+
+<section>
+  <h2>History</h2>
+  <ul class="run-list">
+    {% for run in runs %}
+    <li>
+      <a href="/runs/{{ run.run_id }}">{{ run.goal }}</a>
+      — <span class="status-pill status-{{ run.status }}">{{ run.status }}</span>
+      {% if run.is_seeded_sample %}<em>(built-in example)</em>{% endif %}
+    </li>
+    {% else %}
+    <li>No runs yet.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<script>
+  document.querySelectorAll('.preset-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.getElementById('goal').value = btn.getAttribute('data-goal');
+      document.getElementById('start_url').value = btn.getAttribute('data-start-url');
+      document.getElementById('trigger-form').submit();
+    });
+  });
+</script>
+{% endblock %}

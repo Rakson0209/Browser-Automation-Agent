@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Run {{ run.run_id }} - Browser Automation Agent{% endblock %}
+{% block content %}
+
+<p><a href="/">&larr; Back to dashboard</a></p>
+
+<section id="run-summary">
+  <h2>{{ run.goal }}</h2>
+  <p>
+    Status: <span class="status-pill status-{{ run.status }}" id="run-status">{{ run.status }}</span>
+    &middot; Start URL: <a href="{{ run.start_url }}">{{ run.start_url }}</a>
+    &middot; Provider: {{ run.provider }}
+  </p>
+  {% if run.result_summary %}<p id="run-result-summary"><strong>Result:</strong> {{ run.result_summary }}</p>{% endif %}
+  <p>
+    <a href="/artifacts/{{ run.run_id }}/report.md">report.md</a> &middot;
+    <a href="/artifacts/{{ run.run_id }}/data.json">data.json</a> &middot;
+    <a href="/artifacts/{{ run.run_id }}/run.json">run.json</a> &middot;
+    <a href="/artifacts/{{ run.run_id }}/log.jsonl">log.jsonl</a>
+  </p>
+</section>
+
+<section>
+  <h2>Steps</h2>
+  <div id="steps-container">
+    {% for step in run.steps %}
+    <div class="step">
+      <strong>Step {{ step.index }}</strong> — {{ step.action.type }}
+      <div>Decision: {{ step.decision }}</div>
+      <div>Result: {{ step.action_result }}</div>
+      {% if step.screenshot_path %}
+      <img src="/artifacts/{{ run.run_id }}/{{ step.screenshot_path }}" alt="Screenshot of step {{ step.index }}" />
+      {% endif %}
+    </div>
+    {% else %}
+    <p>No steps recorded yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<script>
+  (function () {
+    var runId = {{ run.run_id | tojson }};
+    var terminalStatuses = ["completed", "failed", "incomplete"];
+    var currentStatus = {{ run.status | tojson }};
+
+    function render(data) {
+      document.getElementById('run-status').textContent = data.status;
+      document.getElementById('run-status').className = 'status-pill status-' + data.status;
+      var container = document.getElementById('steps-container');
+      container.innerHTML = '';
+      if (!data.steps.length) {
+        container.innerHTML = '<p>No steps recorded yet.</p>';
+      }
+      data.steps.forEach(function (step) {
+        var div = document.createElement('div');
+        div.className = 'step';
+        var img = step.screenshot_path
+          ? '<img src="/artifacts/' + runId + '/' + step.screenshot_path + '" />'
+          : '';
+        div.innerHTML = '<strong>Step ' + step.index + '</strong> — ' + step.action.type +
+          '<div>Decision: ' + step.decision + '</div>' +
+          '<div>Result: ' + step.action_result + '</div>' + img;
+        container.appendChild(div);
+      });
+      currentStatus = data.status;
+    }
+
+    function poll() {
+      if (terminalStatuses.indexOf(currentStatus) !== -1) return;
+      fetch('/api/runs/' + runId)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          render(data);
+          if (terminalStatuses.indexOf(data.status) === -1) {
+            setTimeout(poll, 1500);
+          } else if (data.result_summary) {
+            var p = document.getElementById('run-result-summary');
+            if (!p) {
+              p = document.createElement('p');
+              p.id = 'run-result-summary';
+              document.getElementById('run-summary').appendChild(p);
+            }
+            p.innerHTML = '<strong>Result:</strong> ' + data.result_summary;
+          }
+        });
+    }
+
+    if (terminalStatuses.indexOf(currentStatus) === -1) {
+      setTimeout(poll, 1500);
+    }
+  })();
+</script>
+{% endblock %}

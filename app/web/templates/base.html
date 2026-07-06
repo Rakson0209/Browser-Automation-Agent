@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{% block title %}Browser Automation Agent{% endblock %}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    a { color: #2563eb; }
+    header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.5rem; }
+    .status-pill { font-size: 0.85rem; padding: 0.15rem 0.6rem; border-radius: 999px; background: #eee; }
+    .status-completed { background: #dcfce7; color: #166534; }
+    .status-failed { background: #fee2e2; color: #991b1b; }
+    .status-incomplete { background: #fef9c3; color: #854d0e; }
+    .status-in_progress, .status-pending { background: #dbeafe; color: #1e40af; }
+    .run-list { list-style: none; padding: 0; }
+    .run-list li { padding: 0.6rem 0; border-bottom: 1px solid #eee; }
+    .step { border: 1px solid #eee; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
+    .step img { max-width: 100%; border-radius: 6px; margin-top: 0.5rem; }
+    form.trigger-form input[type=text] { width: 100%; padding: 0.4rem; margin-bottom: 0.5rem; }
+    .preset-buttons button { margin: 0 0.4rem 0.4rem 0; }
+    .error { color: #991b1b; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><a href="/">Browser Automation Agent</a></h1>
+    <span id="status-indicator"></span>
+  </header>
+  {% block content %}{% endblock %}
+</body>
+</html>

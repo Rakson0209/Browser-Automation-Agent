@@ -65,13 +65,10 @@ class RunManager:
             "provider_ready": self.provider_ready,
         }
 
-    def start_run(self, goal: str, start_url: str, executor: Callable[[Run], None]) -> Run:
-        """Reserve a run slot then execute synchronously.
-
-        Raises RunRejected — never queues — if busy, quota exhausted, or the
-        configured provider's API key is missing (FR-012, FR-013, FR-017). The
-        provider-readiness check runs before ``executor`` is ever invoked, so a
-        missing key fails fast with no browser/LLM call attempted.
+    def _reserve(self, goal: str, start_url: str) -> Run:
+        """Reserve a run slot. Raises RunRejected — never queues — if busy, quota
+        exhausted, or the configured provider's API key is missing (FR-012, FR-013,
+        FR-017). This check always runs before any browser/LLM call is attempted.
         """
         with self._lock:
             self._reset_quota_if_new_day()
@@ -86,26 +83,52 @@ class RunManager:
             run = Run.new(goal=goal, start_url=start_url, provider=self.config.llm_provider)
             self._active_run_id = run.run_id
             self._runs_started_today += 1
+            return run
 
-        try:
-            executor(run)
-        finally:
-            with self._lock:
-                self._active_run_id = None
-        return run
+    def _release(self) -> None:
+        with self._lock:
+            self._active_run_id = None
 
-    def trigger_run(self, goal: str, start_url: str) -> Run:
-        """Convenience entry point for the CLI/web layer (FR-001): builds the RunLogger
-        for the freshly reserved Run and drives it through the full agent loop.
-        Raises RunRejected under the same conditions as ``start_run`` (FR-012/013/017).
-        """
-
+    def _make_executor(self) -> Callable[[Run], None]:
         def executor(run: Run) -> None:
             secrets = [self.config.anthropic_api_key, self.config.openai_api_key]
             logger = RunLogger(run, runs_root=self.runs_root, secrets=secrets)
             run_agent_loop(run, logger, self.config)
 
-        return self.start_run(goal, start_url, executor)
+        return executor
+
+    def start_run(self, goal: str, start_url: str, executor: Callable[[Run], None]) -> Run:
+        """Reserve a run slot then execute synchronously (blocks until ``executor`` returns)."""
+        run = self._reserve(goal, start_url)
+        try:
+            executor(run)
+        finally:
+            self._release()
+        return run
+
+    def trigger_run(self, goal: str, start_url: str) -> Run:
+        """Synchronous entry point (used by the CLI): drives the run to completion
+        before returning. Raises RunRejected under the same conditions as ``start_run``.
+        """
+        return self.start_run(goal, start_url, self._make_executor())
+
+    def trigger_run_background(self, goal: str, start_url: str) -> Run:
+        """Asynchronous entry point (used by the web dashboard): reserves the slot
+        synchronously (so rejection is immediate) then runs the agent loop on a
+        background thread, returning right away so the caller can redirect to a
+        live-polling detail page.
+        """
+        run = self._reserve(goal, start_url)
+        executor = self._make_executor()
+
+        def _target() -> None:
+            try:
+                executor(run)
+            finally:
+                self._release()
+
+        threading.Thread(target=_target, daemon=True).start()
+        return run
 
     def list_runs(self) -> List[dict]:
         runs = []
