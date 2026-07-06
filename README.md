@@ -131,11 +131,18 @@ The `Dockerfile` is based on the official `python:3.11-slim-bookworm` image — 
 multi-arch manifest list (this project's target compute is Arm-based, Ampere A1,
 CPU-only, no GPU; see the constitution's Compute Profile constraint) — and installs
 Chromium via `playwright install --with-deps`, which runs Playwright's own OS-dependency
-installer for whatever architecture the build actually runs on.
+installer for whatever architecture the build actually runs on. The `FROM` line pins
+`--platform=linux/arm64` explicitly.
 
-> **Do not** base this on `mcr.microsoft.com/playwright/python`: that image is amd64-only
-> today. Using it produced a real Zeabur deployment failure (`exec /usr/bin/sh: exec
-> format error` — the classic architecture-mismatch symptom) before this was corrected.
+> **Two real deploy failures got us here** — both `exec /usr/bin/sh: exec format error`
+> (the classic architecture-mismatch symptom):
+> 1. `mcr.microsoft.com/playwright/python` turned out to be amd64-only despite looking
+>    like it should be multi-arch — don't use it as the base image.
+> 2. Switching to a genuinely multi-arch base (`python:3.11-slim-bookworm`) *without*
+>    pinning `--platform=linux/arm64` still failed — `docker build` otherwise resolves a
+>    multi-arch base to whatever architecture the **build machine** is (commonly amd64),
+>    not the deployment target. A multi-arch base image alone does not guarantee an arm64
+>    build; the platform must be pinned explicitly.
 
 Configure these environment variables on the platform (never commit them):
 

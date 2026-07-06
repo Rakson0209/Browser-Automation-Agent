@@ -247,10 +247,36 @@ familiarity with Microsoft's Playwright images.
   it, don't infer multi-arch from a vendor's general reputation
 
 **Checkpoint**: Dockerfile no longer references the amd64-only image anywhere in code or
-docs; next Zeabur deployment attempt should be re-run by the user to confirm the fix
-(building/pushing to Zeabur is still outside what can be done autonomously from this
-sandbox — no Docker daemon available here either, so this fix is reasoned from the error
-message and known base-image architecture support, not build-tested locally).
+docs. **This fix turned out to be necessary but not sufficient** — see Phase 10, a second
+deployment attempt with this fix still failed with the identical error.
+
+---
+
+## Phase 10: Fix Zeabur Deployment — Unpinned Build Platform (Production Incident #2)
+
+**Purpose**: A second real Zeabur deployment attempt, using the Phase 9 fix, *still*
+failed with the identical `exec /usr/bin/sh: exec format error`. Root cause: a multi-arch
+base image is necessary but not sufficient — `docker build` without an explicit
+`--platform` flag resolves the base image to whatever architecture the **build machine
+itself** is (almost always amd64 on cloud build farms), not the arm64 deployment target.
+Phase 9's fix corrected the base image but never told the build to actually target arm64.
+
+- [X] T072 Pin `FROM --platform=linux/arm64 python:3.11-slim-bookworm` explicitly in the
+  `Dockerfile`, forcing BuildKit to build for arm64 regardless of the build machine's own
+  native architecture (via QEMU emulation if needed)
+- [X] T073 [P] Amend constitution Technology & Platform Constraints (v1.2.1 → v1.2.2,
+  PATCH) to require pinning `--platform` explicitly, not just a multi-arch base image
+- [X] T074 [P] Correct `research.md` §5 and `README.md`'s deployment section to record
+  this second failure and the lesson: a multi-arch base image alone does not guarantee an
+  arm64 build — the build itself must be told to target arm64
+
+**Checkpoint**: Dockerfile now pins the build platform explicitly. As with Phase 9, this
+fix is reasoned from the error message and standard Docker/BuildKit platform-resolution
+behavior — it has not been build-tested locally (no Docker daemon in this sandbox) or
+confirmed against a third live Zeabur deployment attempt yet. If this still fails, the
+next thing to check is whether Zeabur's build backend actually honors a Dockerfile-level
+`--platform` pin at all, or requires a platform/architecture selection in its own project
+settings instead.
 
 ---
 

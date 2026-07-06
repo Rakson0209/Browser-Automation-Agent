@@ -1,13 +1,13 @@
 <!--
 Sync Impact Report
-- Version change: 1.2.0 → 1.2.1 (container base-image correction — bug fix, no new
-  principle/guidance, PATCH per versioning policy)
+- Version change: 1.2.1 → 1.2.2 (second container-build correction — bug fix, PATCH)
 - Modified principles:
-  - Technology & Platform Constraints — Containerization bullet corrected:
-    `mcr.microsoft.com/playwright/python` is amd64-only (not multi-arch as previously
-    assumed) and MUST NOT be used; switched to the genuinely multi-arch official
-    `python` image + `playwright install --with-deps` at build time. Confirmed by an
-    actual Zeabur deployment failing with `exec format error` on the previous image.
+  - Technology & Platform Constraints — Containerization bullet expanded: a multi-arch
+    base image alone does not guarantee an arm64 build; the Dockerfile's `FROM` MUST
+    pin `--platform=linux/arm64` explicitly, or `docker build` silently produces an
+    image matching the build machine's own architecture (commonly amd64) instead of the
+    arm64 runtime target. Confirmed by a second actual Zeabur deployment still failing
+    with `exec format error` after the v1.2.1 base-image fix alone.
 - Added sections: none
 - Removed sections: none
 - Templates requiring updates:
@@ -139,7 +139,13 @@ explicit justification recorded in the relevant plan's Complexity Tracking secti
   layer. `mcr.microsoft.com/playwright/python` MUST NOT be used as the base image — it is
   amd64-only today and fails with `exec format error` on arm64 hosts (confirmed by an
   actual failed Zeabur deployment); any future base-image change MUST verify true
-  multi-arch (arm64) support before adoption, not assume it from documentation alone.
+  multi-arch (arm64) support before adoption, not assume it from documentation alone. A
+  multi-arch base image alone is NOT sufficient: the Dockerfile's `FROM` MUST pin
+  `--platform=linux/arm64` explicitly, because `docker build` otherwise resolves a
+  multi-arch base image to whatever architecture the *build machine itself* is (commonly
+  amd64 on cloud build farms) rather than the deployment target — an unpinned build
+  produced an amd64 image that still failed with `exec format error` on the arm64 runtime
+  even after the base image was corrected, confirmed by a second failed Zeabur deployment.
 - **Deployment platform**: Zeabur (or an equivalent PaaS that supports Dockerfile deploys,
   injected environment variables/secrets, and a generated public domain).
 - **Compute profile**: The deployment target is Arm-based (Ampere A1) CPU-only compute — no
@@ -186,4 +192,4 @@ or materially expanded guidance, PATCH for clarifications and wording fixes.
 after Phase 1 design, and any reviewer of generated plans/tasks MUST verify they do not
 violate Principles II, IV, or V (the NON-NEGOTIABLE items) before approving implementation.
 
-**Version**: 1.2.1 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06
+**Version**: 1.2.2 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06

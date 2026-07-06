@@ -70,33 +70,48 @@ non-fabrication rule, since it wouldn't correspond to a real execution).
 
 ## 5. arm64 / CPU-only compatibility
 
-**Decision (revised after a real deployment failure)**: Base the container image on the
-official `python:3.11-slim-bookworm` image — a genuinely multi-arch manifest list
-maintained by Docker's own library team — and install Chromium via
-`python -m playwright install --with-deps chromium`, which runs Playwright's own
-OS-dependency installer (apt) for whatever architecture the build actually executes on. No
+**Decision (revised twice after two real deployment failures)**: Base the container image
+on the official `python:3.11-slim-bookworm` image — a genuinely multi-arch manifest list
+maintained by Docker's own library team — install Chromium via
+`python -m playwright install --with-deps chromium` (runs Playwright's own OS-dependency
+installer for whatever architecture the build actually executes on), and pin
+`FROM --platform=linux/arm64 python:3.11-slim-bookworm` explicitly in the Dockerfile. No
 GPU-accelerated rendering flags are used; Chromium runs in standard headless CPU mode.
 
-**Original decision (superseded)**: This section originally specified
+**Original decision (superseded, failure #1)**: This section originally specified
 `mcr.microsoft.com/playwright/python`, assumed to be multi-arch based on general
 familiarity with Microsoft's Playwright Docker images. That assumption was **wrong** for
 this specific language-flavored tag — a real Zeabur deployment failed with
 `exec /usr/bin/sh: exec format error` (the canonical architecture-mismatch symptom),
-confirming the image is amd64-only. This is recorded here as a lesson: **verify an image's
-architecture support directly (`docker manifest inspect`, or the vendor's own published
-platform list) before mandating it — don't infer multi-arch support from a base image's
-general reputation.**
+confirming the image is amd64-only.
 
-**Rationale**: The revised approach directly satisfies the constitution's Compute Profile
-constraint (Arm Ampere A1, CPU-only, no GPU) using an image whose multi-arch support is
-well-established (the Docker Official Images program), rather than a vendor image whose
-multi-arch status turned out to be unverified.
+**Second decision (superseded, failure #2)**: Switching to `python:3.11-slim-bookworm`
+without pinning `--platform` was *still* wrong — a second real Zeabur deployment failed
+with the identical `exec format error`. Root cause: `docker build` without an explicit
+`--platform` resolves a multi-arch base image to whatever architecture the **build
+machine itself** is running on (nearly always amd64 for cloud build farms), not the
+deployment target. A multi-arch base image only helps if the build is actually told to
+target arm64.
+
+This is recorded here as a lesson (twice over): **(1)** verify an image's architecture
+support directly (`docker manifest inspect`, or the vendor's own published platform list)
+before mandating it — don't infer multi-arch support from a base image's general
+reputation; **(2)** a multi-arch *base image* is necessary but not sufficient — the
+*build* must also explicitly target the deployment architecture via `--platform`, or the
+build farm's own native architecture wins by default.
+
+**Rationale**: Pinning `--platform=linux/arm64` directly satisfies the constitution's
+Compute Profile constraint (Arm Ampere A1, CPU-only, no GPU) regardless of what
+architecture the CI/build machine happens to be, using an image whose multi-arch support
+is well-established (the Docker Official Images program).
 
 **Alternatives considered**: A custom Dockerfile installing Chromium from scratch (this
 *is* effectively what `--with-deps` does, but via Playwright's own maintained installer
 rather than hand-rolled apt package lists — lower maintenance burden, same arm64
 correctness); GPU-accelerated headless mode (not applicable — no GPU exists on the target
-compute).
+compute); relying on a Zeabur platform-level "target architecture" setting instead of
+pinning in the Dockerfile (rejected — no such setting was available/known from this
+sandbox, so pinning in the Dockerfile is the portable, tool-independent fix).
 
 ## 6. Offline-first browser test strategy
 
