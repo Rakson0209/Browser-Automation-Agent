@@ -184,7 +184,11 @@ name and confirm it runs the same task end-to-end and produces the same artifact
   MUST NEVER be persisted server-side (disk, session store, or otherwise) or written to any
   log/report/artifact — it is subject to the same non-fabrication and non-leak guarantees
   (FR-004, FR-011) as the operator's own key. When a user does not choose to supply their
-  own key, the server-configured default (FR-017) continues to apply unchanged.
+  own key, the server-configured default (FR-017) continues to apply unchanged. A user MAY
+  additionally supply a custom endpoint URL and/or model name alongside their key (e.g. to
+  point the "openai" provider at an OpenAI-compatible API such as DeepSeek); a supplied
+  endpoint URL MUST be validated as a public http(s) address and MUST NOT be honored if it
+  targets localhost or a private/link-local network address (basic SSRF protection).
 
 ### Key Entities
 

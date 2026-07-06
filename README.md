@@ -58,6 +58,10 @@ uvicorn app.web.server:app --reload
 # open http://localhost:8000
 ```
 
+The UI is a single-file, no-build-pipeline dark theme (GitHub-dark-inspired: cards,
+monospace inputs, status pills) served entirely through Jinja2 templates in
+`app/web/templates/` — no JS framework or bundler involved.
+
 The dashboard shows a built-in example run (`app/samples/seed-quotes-humor/`, a genuine
 4-step execution against quotes.toscrape.com) immediately, even before you trigger
 anything — this guarantees there's always something verifiable to look at, since the
@@ -65,28 +69,33 @@ anything — this guarantees there's always something verifiable to look at, sin
 
 **Bring your own key**: the trigger form has a "Use server default" / "Use my own key"
 toggle. On a public deployment, a visitor who doesn't want to (or shouldn't) spend the
-operator's own budget can switch to "custom," pick a provider, and paste in their own API
-key. That key is used only for that one run, is remembered in the browser's own
+operator's own budget can switch to "custom," pick a provider (or a quick preset —
+Anthropic / OpenAI / DeepSeek — which pre-fills the endpoint and a suggested model), and
+paste in their own API key. That key — along with the optional base URL and model, if
+supplied — is used only for that one run, is remembered in the browser's own
 `sessionStorage` for convenience (never sent anywhere except back to this server when
 triggering a run), and is never written to disk, a session store, or any log/report on
-the server (constitution Principle II).
+the server (constitution Principle II). A supplied base URL passes a basic SSRF guard
+(must be a public http(s) address — localhost and private/link-local IPs are rejected).
 
 **Using DeepSeek (or any other OpenAI-compatible API)**: `LLM_PROVIDER=openai` doesn't
-have to mean OpenAI itself — set `OPENAI_BASE_URL` to any endpoint that speaks the same
-chat-completions wire format (DeepSeek, Together.ai, a local vLLM server, ...):
+have to mean OpenAI itself — any endpoint that speaks the same chat-completions wire
+format works (DeepSeek, Together.ai, a local vLLM server, ...). Two ways to point it
+there:
 
-```bash
-LLM_PROVIDER=openai
-OPENAI_API_KEY=<your DeepSeek key>
-OPENAI_BASE_URL=https://api.deepseek.com
-OPENAI_MODEL=deepseek-chat
-```
+- **As the operator's own default** — set `OPENAI_BASE_URL` in `.env`:
+  ```bash
+  LLM_PROVIDER=openai
+  OPENAI_API_KEY=<your DeepSeek key>
+  OPENAI_BASE_URL=https://api.deepseek.com
+  OPENAI_MODEL=deepseek-chat
+  ```
+- **As a visitor, per-run** — pick "Use my own key" → provider "OpenAI (or an
+  OpenAI-compatible API)" → the "DeepSeek" quick preset (or type the base URL/model in
+  manually) → paste in a DeepSeek key. No operator configuration needed for this path.
 
-No code changes needed — this applies to both the server's own default credential and to
-"bring your own key" visitors who pick "openai" (they inherit whatever `OPENAI_BASE_URL`
-the operator configured, using their own key against that same endpoint). The web form
-itself does not let a visitor specify an arbitrary base URL, to avoid turning the trigger
-endpoint into an open-ended request proxy — only the operator's env var controls routing.
+No code changes needed either way — both go through the same `openai_base_url` config
+field, just sourced from an env var vs. a per-request override.
 
 **CLI:**
 
@@ -105,10 +114,11 @@ pytest tests/unit tests/llm tests/integration tests/web -q
 All tests run offline — the browser-integration suite drives real Chromium against local
 HTML fixtures under `tests/integration/fixtures/`, never a live third-party site, so the
 suite doesn't depend on any external service being reachable. As of this writing all
-tests pass (78 tests: config incl. OpenAI-compatible endpoint overrides, LLM adapters,
+tests pass (91 tests: config incl. OpenAI-compatible endpoint overrides, LLM adapters,
 browser snapshotting, action dispatch, artifact logging incl. secret redaction, run
-throttling incl. bring-your-own-key, the full agent loop incl. an unexpected-error safety
-net, the web API, presets, and the CLI).
+throttling incl. bring-your-own-key with a custom base URL/model, an SSRF guard for
+visitor-supplied endpoints, the full agent loop incl. an unexpected-error safety net, the
+web API, presets, and the CLI).
 
 ## Key assumptions
 

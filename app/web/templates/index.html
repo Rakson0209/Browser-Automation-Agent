@@ -4,84 +4,130 @@
 
 <section>
   <h2>Start a new run</h2>
-  {% if error %}<p class="error">{{ error }}</p>{% endif %}
-  <form class="trigger-form" method="post" action="/run" id="trigger-form">
-    <label for="goal">Goal</label>
-    <input type="text" id="goal" name="goal" placeholder="e.g. collect all humor-tagged quotes" required />
-    <label for="start_url">Start URL</label>
-    <input type="text" id="start_url" name="start_url" placeholder="https://example.com" required />
+  <div class="card">
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <form method="post" action="/run" id="trigger-form">
+      <label for="goal">Goal</label>
+      <input type="text" id="goal" name="goal" placeholder="e.g. collect all humor-tagged quotes" required />
 
-    <fieldset class="llm-source">
-      <legend>LLM credential</legend>
-      <label>
-        <input type="radio" name="llm_source" value="default" id="llm-source-default" checked />
-        Use server default
-        {% if not provider_ready %}<span class="error">(not configured — please use your own key)</span>{% endif %}
-      </label>
-      <label>
-        <input type="radio" name="llm_source" value="custom" id="llm-source-custom" />
-        Use my own key
-      </label>
+      <label for="start_url">Start URL</label>
+      <input type="text" id="start_url" name="start_url" placeholder="https://example.com" required />
 
-      <div id="custom-key-fields" style="display:none;">
-        <label for="llm_provider">Provider</label>
-        <select name="llm_provider" id="llm_provider">
-          <option value="anthropic">Anthropic</option>
-          <option value="openai">OpenAI</option>
-        </select>
-        <label for="llm_api_key">API Key</label>
-        <input type="password" name="llm_api_key" id="llm_api_key" placeholder="sk-..." autocomplete="off" />
-        <p><small>Your key is used only for this run, kept in your browser's session storage
-        for convenience, and is never stored on the server or written to any log/report.</small></p>
+      <fieldset>
+        <legend>LLM credential</legend>
+        <label class="radio">
+          <input type="radio" name="llm_source" value="default" id="llm-source-default" checked />
+          Use server default
+          {% if not provider_ready %}<span class="error" style="margin:0; font-size:.8rem;">(not configured — use your own key)</span>{% endif %}
+        </label>
+        <label class="radio">
+          <input type="radio" name="llm_source" value="custom" id="llm-source-custom" />
+          Use my own key
+        </label>
+
+        <div id="custom-key-fields" style="display:none; margin-top:10px;">
+          <label for="llm-endpoint-preset">Quick preset</label>
+          <select id="llm-endpoint-preset">
+            <option value="">Manual entry</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="openai">OpenAI</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+
+          <label for="llm_provider">Provider</label>
+          <select name="llm_provider" id="llm_provider">
+            <option value="anthropic">Anthropic</option>
+            <option value="openai">OpenAI (or an OpenAI-compatible API)</option>
+          </select>
+
+          <label for="llm_api_key">API Key</label>
+          <input type="password" name="llm_api_key" id="llm_api_key" placeholder="sk-..." autocomplete="off" />
+
+          <label for="llm_base_url">Base URL <span class="muted">(optional — for OpenAI-compatible APIs like DeepSeek)</span></label>
+          <input type="text" name="llm_base_url" id="llm_base_url" placeholder="https://api.deepseek.com" autocomplete="off" />
+
+          <label for="llm_model">Model <span class="muted">(optional)</span></label>
+          <input type="text" name="llm_model" id="llm_model" placeholder="deepseek-chat" autocomplete="off" />
+
+          <p class="hint">Used only for this run, remembered in your browser's own session
+          storage for convenience, and never stored on the server or written to any
+          log/report.</p>
+        </div>
+      </fieldset>
+
+      <div style="margin-top:18px;">
+        <button type="submit">Start Run</button>
       </div>
-    </fieldset>
+    </form>
 
-    <button type="submit">Start Run</button>
-  </form>
-
-  <div class="preset-buttons">
-    <h3>Preset tasks</h3>
-    {% for preset in presets %}
-    <button type="button"
-            class="preset-btn"
-            data-goal="{{ preset.goal }}"
-            data-start-url="{{ preset.start_url }}">
-      {{ preset.label }}
-    </button>
-    {% endfor %}
+    {% if presets %}
+    <div class="preset-buttons">
+      {% for preset in presets %}
+      <button type="button"
+              class="btn secondary preset-btn"
+              data-goal="{{ preset.goal }}"
+              data-start-url="{{ preset.start_url }}">
+        {{ preset.label }}
+      </button>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
 </section>
 
 <section>
   <h2>History</h2>
-  <ul class="run-list">
-    {% for run in runs %}
-    <li>
-      <a href="/runs/{{ run.run_id }}">{{ run.goal }}</a>
-      — <span class="status-pill status-{{ run.status }}">{{ run.status }}</span>
-      {% if run.is_seeded_sample %}<em>(built-in example)</em>{% endif %}
-    </li>
-    {% else %}
-    <li>No runs yet.</li>
-    {% endfor %}
-  </ul>
+  <div class="card">
+    <ul class="run-list">
+      {% for run in runs %}
+      <li>
+        <a href="/runs/{{ run.run_id }}">{{ run.goal }}</a>
+        <span>
+          <span class="status-pill status-{{ run.status }}">{{ run.status }}</span>
+          {% if run.is_seeded_sample %}<span class="muted" style="margin-left:6px; font-size:.8rem;">(built-in example)</span>{% endif %}
+        </span>
+      </li>
+      {% else %}
+      <li class="muted">No runs yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
 </section>
 
 <script>
   (function () {
-    var STORAGE_KEY = 'baa_llm_custom_key_v1';
+    var STORAGE_KEY = 'baa_llm_custom_key_v2';
     var customFields = document.getElementById('custom-key-fields');
     var providerSelect = document.getElementById('llm_provider');
     var apiKeyInput = document.getElementById('llm_api_key');
+    var baseUrlInput = document.getElementById('llm_base_url');
+    var modelInput = document.getElementById('llm_model');
+    var presetSelect = document.getElementById('llm-endpoint-preset');
     var defaultRadio = document.getElementById('llm-source-default');
     var customRadio = document.getElementById('llm-source-custom');
     var serverProviderReady = {{ 'true' if provider_ready else 'false' }};
+
+    // Curated presets for common OpenAI-compatible endpoints — no external package
+    // needed, this is just a small lookup table filling in known base_url/model pairs.
+    var ENDPOINT_PRESETS = {
+      anthropic: { provider: 'anthropic', baseUrl: '', model: 'claude-sonnet-5' },
+      openai: { provider: 'openai', baseUrl: '', model: 'gpt-4o' },
+      deepseek: { provider: 'openai', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' }
+    };
 
     function updateVisibility() {
       customFields.style.display = customRadio.checked ? 'block' : 'none';
     }
     defaultRadio.addEventListener('change', updateVisibility);
     customRadio.addEventListener('change', updateVisibility);
+
+    presetSelect.addEventListener('change', function () {
+      var preset = ENDPOINT_PRESETS[presetSelect.value];
+      if (!preset) return;
+      providerSelect.value = preset.provider;
+      baseUrlInput.value = preset.baseUrl;
+      modelInput.value = preset.model;
+    });
 
     // Restore a previously entered custom key from this browser tab's session only —
     // never sent anywhere except back to this same server when the form is submitted.
@@ -91,6 +137,8 @@
         var data = JSON.parse(saved);
         providerSelect.value = data.provider || 'anthropic';
         apiKeyInput.value = data.apiKey || '';
+        baseUrlInput.value = data.baseUrl || '';
+        modelInput.value = data.model || '';
         customRadio.checked = true;
       } else if (!serverProviderReady) {
         // Nudge visitors toward "custom" if the operator hasn't configured a key.
@@ -104,7 +152,9 @@
         if (customRadio.checked) {
           sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
             provider: providerSelect.value,
-            apiKey: apiKeyInput.value
+            apiKey: apiKeyInput.value,
+            baseUrl: baseUrlInput.value,
+            model: modelInput.value
           }));
         } else {
           sessionStorage.removeItem(STORAGE_KEY);

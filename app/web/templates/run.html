@@ -4,20 +4,22 @@
 
 <p><a href="/">&larr; Back to dashboard</a></p>
 
-<section id="run-summary">
-  <h2>{{ run.goal }}</h2>
-  <p>
-    Status: <span class="status-pill status-{{ run.status }}" id="run-status">{{ run.status }}</span>
-    &middot; Start URL: <a href="{{ run.start_url }}">{{ run.start_url }}</a>
-    &middot; Provider: {{ run.provider }}
-  </p>
-  {% if run.result_summary %}<p id="run-result-summary"><strong>Result:</strong> {{ run.result_summary }}</p>{% endif %}
-  <p>
-    <a href="/artifacts/{{ run.run_id }}/report.md">report.md</a> &middot;
-    <a href="/artifacts/{{ run.run_id }}/data.json">data.json</a> &middot;
-    <a href="/artifacts/{{ run.run_id }}/run.json">run.json</a> &middot;
-    <a href="/artifacts/{{ run.run_id }}/log.jsonl">log.jsonl</a>
-  </p>
+<section style="margin-top:16px;">
+  <div class="card" id="run-summary">
+    <h2 style="border:0; padding:0; margin:0 0 10px;">{{ run.goal }}</h2>
+    <p class="muted" style="margin:0 0 10px;">
+      <span class="status-pill status-{{ run.status }}" id="run-status">{{ run.status }}</span>
+      &nbsp;&middot;&nbsp;<a href="{{ run.start_url }}">{{ run.start_url }}</a>
+      &nbsp;&middot;&nbsp;{{ run.provider }}
+    </p>
+    {% if run.result_summary %}<p id="run-result-summary"><strong>Result:</strong> {{ run.result_summary }}</p>{% endif %}
+    <p class="muted" style="font-size:.85rem; margin-bottom:0;">
+      <a href="/artifacts/{{ run.run_id }}/report.md">report.md</a> &middot;
+      <a href="/artifacts/{{ run.run_id }}/data.json">data.json</a> &middot;
+      <a href="/artifacts/{{ run.run_id }}/run.json">run.json</a> &middot;
+      <a href="/artifacts/{{ run.run_id }}/log.jsonl">log.jsonl</a>
+    </p>
+  </div>
 </section>
 
 <section>
@@ -25,15 +27,15 @@
   <div id="steps-container">
     {% for step in run.steps %}
     <div class="step">
-      <strong>Step {{ step.index }}</strong> — {{ step.action.type }}
-      <div>Decision: {{ step.decision }}</div>
-      <div>Result: {{ step.action_result }}</div>
+      <strong>Step {{ step.index }}</strong> <span class="muted">— {{ step.action.type }}</span>
+      <div class="muted" style="margin-top:6px;">Decision: {{ step.decision }}</div>
+      <div class="muted">Result: {{ step.action_result }}</div>
       {% if step.screenshot_path %}
       <img src="/artifacts/{{ run.run_id }}/{{ step.screenshot_path }}" alt="Screenshot of step {{ step.index }}" />
       {% endif %}
     </div>
     {% else %}
-    <p>No steps recorded yet.</p>
+    <p class="muted">No steps recorded yet.</p>
     {% endfor %}
   </div>
 </section>
@@ -50,7 +52,7 @@
       var container = document.getElementById('steps-container');
       container.innerHTML = '';
       if (!data.steps.length) {
-        container.innerHTML = '<p>No steps recorded yet.</p>';
+        container.innerHTML = '<p class="muted">No steps recorded yet.</p>';
       }
       data.steps.forEach(function (step) {
         var div = document.createElement('div');
@@ -58,9 +60,9 @@
         var img = step.screenshot_path
           ? '<img src="/artifacts/' + runId + '/' + step.screenshot_path + '" />'
           : '';
-        div.innerHTML = '<strong>Step ' + step.index + '</strong> — ' + step.action.type +
-          '<div>Decision: ' + step.decision + '</div>' +
-          '<div>Result: ' + step.action_result + '</div>' + img;
+        div.innerHTML = '<strong>Step ' + step.index + '</strong> <span class="muted">— ' + step.action.type + '</span>' +
+          '<div class="muted" style="margin-top:6px;">Decision: ' + step.decision + '</div>' +
+          '<div class="muted">Result: ' + step.action_result + '</div>' + img;
         container.appendChild(div);
       });
       currentStatus = data.status;

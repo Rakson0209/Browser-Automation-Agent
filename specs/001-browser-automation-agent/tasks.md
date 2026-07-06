@@ -280,6 +280,43 @@ settings instead.
 
 ---
 
+## Phase 11: Dashboard Redesign + Custom Endpoint/Model for Bring-Your-Own-Key
+
+**Purpose**: Zeabur deployment confirmed working. Two follow-up requests: (1) restyle the
+dashboard to match a reference design (GitHub-dark aesthetic: cards, monospace inputs,
+status pills); (2) let "bring your own key" visitors also specify a custom endpoint URL
+and model name (not just provider + key), so e.g. a DeepSeek key can actually reach
+DeepSeek's API rather than only being accepted and then failing against OpenAI's endpoint.
+
+- [X] T075 [P] Add `anthropic_base_url` to `Configuration` (env `ANTHROPIC_BASE_URL`) for
+  symmetry with `openai_base_url`, and pass both through to their respective SDK clients
+  in `app/agent/llm.py`
+- [X] T076 Extend `RunManager._make_executor`/`trigger_run`/`trigger_run_background` with
+  `override_base_url`/`override_model`, applied to the ephemeral per-run `Configuration`
+  only when the corresponding override is supplied, in `app/runner.py`
+- [X] T077 Add an SSRF guard (`_is_safe_external_url`: http(s) only, rejects localhost and
+  private/link-local/loopback/multicast IP literals) and wire `llm_base_url`/`llm_model`
+  form fields through `POST /run`, in `app/web/server.py`
+- [X] T078 [P] Unit/web tests for the base_url/model override plumbing and the SSRF guard
+  (public URL allowed; localhost, 127.0.0.1, 10.x/172.16.x/192.168.x, and the cloud
+  metadata address 169.254.169.254 all rejected) in `tests/unit/test_runner.py`,
+  `tests/web/test_run_trigger.py`, and `tests/web/test_ssrf_guard.py`
+- [X] T079 Redesign `app/web/templates/base.html` with a GitHub-dark-inspired design
+  system (CSS custom properties, card/panel layout, monospace form inputs, status pills)
+  matching a user-supplied reference site, and restyle `index.html`/`run.html` to match
+- [X] T080 Add a "quick preset" dropdown (Anthropic / OpenAI / DeepSeek) to the custom-key
+  form in `index.html` that pre-fills provider + base URL + suggested model — a small
+  curated JS lookup table, not an external package, consistent with the "no frontend
+  build pipeline" constraint
+- [X] T081 [P] Update spec.md (FR-018 extended), data-model.md (Configuration +
+  per-request override table), contracts/web-api.md (`POST /run` fields), and README.md
+  (BYOK section, DeepSeek instructions, UI description) to match
+
+**Checkpoint**: 91/91 tests passing; visually verified via real Playwright screenshots of
+the redesigned dashboard home (default + custom-key states) and run detail page.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

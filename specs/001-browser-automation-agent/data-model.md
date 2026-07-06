@@ -163,14 +163,17 @@ Enforces Principle VII.
 | `anthropic_api_key` / `openai_api_key` | env, only the one matching `llm_provider` is required | Never logged, never committed (Principle II) |
 | `daily_run_limit` | env `DAILY_RUN_LIMIT` | Feeds `RunManager.daily_run_limit` |
 | `max_steps_per_run` | env (implementation default documented in plan, not user-facing) | Enforces FR-008's step-limit-without-success outcome |
+| `openai_base_url` / `anthropic_base_url` | env `OPENAI_BASE_URL` / `ANTHROPIC_BASE_URL`, optional | Lets the operator's own default point at any OpenAI/Anthropic-compatible endpoint (e.g. DeepSeek); `None` uses each SDK's own default endpoint (research.md §5-adjacent design, not itself an arm64 concern) |
 
 **Per-request override (not part of `Configuration`, never persisted)**: a web user MAY
-supply `override_provider` + `override_api_key` with a single `POST /run` request
-("bring your own key", FR-018). These values exist only for the lifetime of that one run's
-execution (held in memory, passed to an ephemeral copy of `Configuration` used only by that
-run's `LLMClient`) and are added to that run's `RunLogger` secret-redaction list the same as
-the server's own key (Principle V, SC-007/SC-009) — they are never written to `self.config`,
-disk, a session store, or any artifact.
+supply `override_provider` + `override_api_key`, and optionally `override_base_url` +
+`override_model`, with a single `POST /run` request ("bring your own key", FR-018). These
+values exist only for the lifetime of that one run's execution (held in memory, passed to
+an ephemeral copy of `Configuration` used only by that run's `LLMClient`) and are added to
+that run's `RunLogger` secret-redaction list the same as the server's own key (Principle V,
+SC-007/SC-009) — they are never written to `self.config`, disk, a session store, or any
+artifact. `override_base_url`, when supplied, MUST pass an SSRF guard (public http(s) URL,
+not localhost or a private/link-local address) before being honored.
 
 ## Entity Relationships
 

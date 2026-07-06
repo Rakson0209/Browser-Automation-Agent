@@ -1,31 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Browser Automation Agent{% endblock %}</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
-    a { color: #2563eb; }
-    header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.5rem; }
-    .status-pill { font-size: 0.85rem; padding: 0.15rem 0.6rem; border-radius: 999px; background: #eee; }
-    .status-completed { background: #dcfce7; color: #166534; }
-    .status-failed { background: #fee2e2; color: #991b1b; }
-    .status-incomplete { background: #fef9c3; color: #854d0e; }
-    .status-in_progress, .status-pending { background: #dbeafe; color: #1e40af; }
-    .run-list { list-style: none; padding: 0; }
-    .run-list li { padding: 0.6rem 0; border-bottom: 1px solid #eee; }
-    .step { border: 1px solid #eee; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
-    .step img { max-width: 100%; border-radius: 6px; margin-top: 0.5rem; }
-    form.trigger-form input[type=text] { width: 100%; padding: 0.4rem; margin-bottom: 0.5rem; }
-    .preset-buttons button { margin: 0 0.4rem 0.4rem 0; }
-    .error { color: #991b1b; }
+    :root {
+      --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#e6edf3;
+      --muted:#8b949e; --accent:#58a6ff; --accent2:#3fb950; --danger:#f85149; --warn:#d29922;
+      --code-bg:#1f2630;
+    }
+    * { box-sizing:border-box; }
+    html, body { max-width: 100%; overflow-x: hidden; }
+    body { margin:0; background:var(--bg); color:var(--text); line-height:1.65;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",Roboto,Helvetica,Arial,sans-serif;
+      -webkit-font-smoothing:antialiased; }
+    a { color:var(--accent); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    code, input, select, button { font-family:"SF Mono","Cascadia Code",Consolas,"Liberation Mono",monospace; }
+    code { background:var(--code-bg); padding:.12em .4em; border-radius:5px; font-size:.9em; color:#d2d9e0; }
+    .wrap { max-width:960px; margin:0 auto; padding:0 20px 80px; }
+    header.top { border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg,#11151c 0%,var(--bg) 100%); padding:40px 20px 32px; }
+    header.top .inner { max-width:960px; margin:0 auto; }
+    .badge { display:inline-block; font-size:.75rem; color:var(--accent2);
+      border:1px solid var(--accent2); border-radius:999px; padding:2px 10px; margin-bottom:14px; letter-spacing:.04em; }
+    h1 { font-size:1.9rem; margin:0 0 6px; line-height:1.2; }
+    h1 a { color:var(--text); }
+    .tagline { color:var(--muted); font-size:1rem; max-width:700px; margin:0; }
+    section { margin-top:40px; }
+    h2 { font-size:1.2rem; margin:0 0 16px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+    h3 { font-size:1rem; color:var(--muted); margin:0 0 10px; font-weight:600; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; }
+    label { display:block; font-size:.85rem; color:var(--muted); margin:14px 0 6px; }
+    label:first-of-type { margin-top:0; }
+    input[type=text], input[type=password], select {
+      width:100%; padding:9px 12px; background:var(--code-bg); border:1px solid var(--border);
+      border-radius:6px; color:var(--text); font-size:.92rem;
+    }
+    input:focus, select:focus { outline:none; border-color:var(--accent); }
+    fieldset { border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin:18px 0 0; }
+    legend { padding:0 6px; color:var(--muted); font-size:.85rem; }
+    fieldset label.radio { display:inline-flex; align-items:center; gap:6px; margin:0 18px 8px 0; color:var(--text); font-size:.9rem; }
+    fieldset label.radio input { width:auto; }
+    button, .btn { background:var(--accent); color:#0b0f14; border:0; border-radius:6px;
+      padding:9px 18px; cursor:pointer; font-size:.92rem; font-weight:600; }
+    button:hover, .btn:hover { opacity:.9; }
+    button.secondary { background:transparent; color:var(--text); border:1px solid var(--border); font-weight:400; }
+    button.secondary:hover { border-color:var(--accent); opacity:1; }
+    .preset-buttons { margin-top:16px; display:flex; flex-wrap:wrap; gap:8px; }
+    .status-pill { display:inline-block; font-size:.75rem; padding:2px 10px; border-radius:999px; border:1px solid var(--border); white-space:nowrap; }
+    .status-completed { color:var(--accent2); border-color:var(--accent2); }
+    .status-failed { color:var(--danger); border-color:var(--danger); }
+    .status-incomplete { color:var(--warn); border-color:var(--warn); }
+    .status-in_progress, .status-pending { color:var(--accent); border-color:var(--accent); }
+    ul.run-list { list-style:none; padding:0; margin:0; }
+    ul.run-list li { padding:12px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    ul.run-list li:last-child { border-bottom:0; }
+    .muted { color:var(--muted); }
+    .error { color:var(--danger); font-size:.9rem; margin:0 0 14px; }
+    .hint { color:var(--muted); font-size:.8rem; margin:6px 0 0; }
+    .step { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin-bottom:14px; }
+    .step img { max-width:100%; border-radius:6px; margin-top:10px; border:1px solid var(--border); }
+    footer.site { margin-top:56px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted); font-size:.85rem; }
   </style>
 </head>
 <body>
-  <header>
-    <h1><a href="/">Browser Automation Agent</a></h1>
-    <span id="status-indicator"></span>
+  <header class="top">
+    <div class="inner">
+      <span class="badge">BROWSER AUTOMATION AGENT</span>
+      <h1><a href="/">Browser Automation Agent</a></h1>
+      <p class="tagline">LLM 驅動的瀏覽器自動化代理 — 給定自然語言目標與起始網址，自動觀察頁面、決策下一步、執行操作，產出可驗證的報告與截圖。</p>
+    </div>
   </header>
-  {% block content %}{% endblock %}
+  <div class="wrap">
+    {% block content %}{% endblock %}
+    <footer class="site">
+      <a href="/healthz">healthz</a>
+    </footer>
+  </div>
 </body>
 </html>
