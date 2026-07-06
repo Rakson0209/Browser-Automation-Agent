@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from datetime import date
 
-from app.agent.logger import Run
+from app.agent.agent import run_agent_loop
+from app.agent.logger import Run, RunLogger
 from app.config import Configuration
 
 
@@ -92,6 +93,19 @@ class RunManager:
             with self._lock:
                 self._active_run_id = None
         return run
+
+    def trigger_run(self, goal: str, start_url: str) -> Run:
+        """Convenience entry point for the CLI/web layer (FR-001): builds the RunLogger
+        for the freshly reserved Run and drives it through the full agent loop.
+        Raises RunRejected under the same conditions as ``start_run`` (FR-012/013/017).
+        """
+
+        def executor(run: Run) -> None:
+            secrets = [self.config.anthropic_api_key, self.config.openai_api_key]
+            logger = RunLogger(run, runs_root=self.runs_root, secrets=secrets)
+            run_agent_loop(run, logger, self.config)
+
+        return self.start_run(goal, start_url, executor)
 
     def list_runs(self) -> List[dict]:
         runs = []

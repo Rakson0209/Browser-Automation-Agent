@@ -338,19 +338,25 @@ class LLMClient:
             self._sdk_client = openai.OpenAI(api_key=self.config.openai_api_key)
         return self._sdk_client
 
-    def decide(self, messages: List[Dict[str, Any]]) -> AssistantTurn:
+    def decide(
+        self, messages: List[Dict[str, Any]], system_prompt: Optional[str] = None
+    ) -> AssistantTurn:
         """Send the current message history to the live provider and parse the next Action."""
         if self.config.llm_provider == "anthropic":
             response = self._sdk().messages.create(
                 model=self.config.active_model(),
                 max_tokens=1024,
+                system=system_prompt,
                 tools=self.adapter.tool_schema(),
                 messages=messages,
             )
         else:
+            oa_messages = messages
+            if system_prompt:
+                oa_messages = [{"role": "system", "content": system_prompt}] + messages
             response = self._sdk().chat.completions.create(
                 model=self.config.active_model(),
                 tools=self.adapter.tool_schema(),
-                messages=messages,
+                messages=oa_messages,
             )
         return self.adapter.parse_response(response)
