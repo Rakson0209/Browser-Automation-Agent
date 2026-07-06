@@ -117,6 +117,10 @@ FR-016).
 **Validation rules**:
 - All five files MUST exist for any `Run` whose `status` is `completed`, `failed`, or
   `incomplete` (SC-003) — even failure/incomplete runs get a full, honest artifact set.
+- None of the five files MUST ever contain the configured `anthropic_api_key` / `openai_api_key`
+  value or any other secret (SC-007) — `RunLogger` MUST NOT write raw exception text or
+  request/response payloads that could carry a credential; this is verified by an automated
+  test that scans generated artifacts for the configured secret value.
 
 ## PresetTask
 
@@ -138,10 +142,13 @@ Enforces Principle VII.
 | `active_run_id` | string \| null | Non-null while a run is `in_progress`; enforces single concurrency |
 | `runs_started_today` | integer | Reset at day boundary; compared against `daily_run_limit` |
 | `daily_run_limit` | integer | From configuration (env var), not hard-coded |
+| `provider_ready` | boolean | `false` when `Configuration`'s API key for the selected `llm_provider` is missing (FR-017) |
 
 **Validation rules**:
-- A new run request MUST be rejected (not queued) whenever `active_run_id` is non-null or
-  `runs_started_today >= daily_run_limit`, per the spec's edge cases.
+- A new run request MUST be rejected (not queued) whenever `active_run_id` is non-null,
+  `runs_started_today >= daily_run_limit`, or `provider_ready` is `false`, per the spec's
+  edge cases — the `provider_ready` check MUST run before any browser or LLM call is
+  attempted, so a missing key fails fast with a configuration error rather than mid-run.
 
 ## Configuration (Principle II)
 

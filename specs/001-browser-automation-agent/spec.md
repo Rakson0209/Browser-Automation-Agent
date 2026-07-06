@@ -112,6 +112,9 @@ name and confirm it runs the same task end-to-end and produces the same artifact
 - What happens when the site's structure changes mid-run (e.g. a button's class name
   changes)? The agent's element targeting MUST continue to function based on the current
   page snapshot rather than a hard-coded selector.
+- What happens when the configured LLM provider has no matching API key set? The system
+  MUST refuse to start a new run and report a clear configuration error immediately, rather
+  than starting a run that would only fail once execution reaches its first LLM call.
 
 ## Requirements *(mandatory)*
 
@@ -164,6 +167,10 @@ name and confirm it runs the same task end-to-end and produces the same artifact
   local fixtures rather than live third-party sites), the AI-provider abstraction's
   correctness across providers, and web-service startup/routing/error handling. This suite
   MUST pass in full before any deployment.
+- **FR-017**: System MUST reject a request to start a new run — whether submitted via the
+  dashboard or the CLI — if the configured LLM provider's required API key is not present,
+  returning a clear configuration-error message instead of starting a run that would only
+  fail once execution reaches its first LLM call.
 
 ### Key Entities
 
@@ -197,8 +204,9 @@ name and confirm it runs the same task end-to-end and produces the same artifact
   report in under 2 minutes.
 - **SC-006**: Zero instances of a run being reported as successful when the stated goal was
   not actually achieved, across all verification testing.
-- **SC-007**: Zero secrets (API keys or credentials) ever appear in version-controlled files
-  or in any publicly viewable log or report.
+- **SC-007**: Zero secrets (API keys or credentials) ever appear in version-controlled files,
+  in any run artifact (report, structured data, log), or in any publicly viewable log or
+  report — verified by automated inspection of artifact contents, not just by code review.
 - **SC-008**: 100% of the automated test suite (covering the areas listed in FR-016) passes
   with zero failures prior to every deployment.
 

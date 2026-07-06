@@ -44,8 +44,8 @@ Single project per [plan.md](./plan.md) Structure Decision: `app/` at repository
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 [P] Implement configuration loader in `app/config.py` reading `LLM_PROVIDER`, `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`, `DAILY_RUN_LIMIT`, `MAX_STEPS_PER_RUN` from environment/`.env` (data-model.md Configuration; constitution Principle II)
-- [ ] T006 [P] Unit test for the config loader (missing key, invalid provider, defaults) in `tests/unit/test_config.py` — write first, must fail before T005 is complete
+- [ ] T005 [P] Implement configuration loader in `app/config.py` reading `LLM_PROVIDER`, `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`, `DAILY_RUN_LIMIT`, `MAX_STEPS_PER_RUN` from environment/`.env`, exposing an `is_provider_ready()` check that is `false` when the selected provider's API key is missing (data-model.md Configuration; constitution Principle II; FR-017)
+- [ ] T006 [P] Unit test for the config loader (missing key, invalid provider, defaults, `is_provider_ready()` returning `false` when the selected provider's key is absent) in `tests/unit/test_config.py` — write first, must fail before T005 is complete
 - [ ] T007 Define neutral turn/action types — `UserTurn`, `AssistantTurn`, `ToolResultsTurn`, `Action`, `PageSnapshot`, `ElementSnapshot` — in `app/agent/llm.py` (data-model.md; contracts/agent-tools.md; constitution Principle IV)
 - [ ] T008 Implement the Anthropic tool-use adapter translating neutral turns to/from Anthropic's API in `app/agent/llm.py` (research.md §1) — depends on T007
 - [ ] T009 Implement the OpenAI function-calling adapter translating neutral turns to/from OpenAI's API in `app/agent/llm.py` (research.md §1) — depends on T007
@@ -55,10 +55,10 @@ Single project per [plan.md](./plan.md) Structure Decision: `app/` at repository
 - [ ] T013 [P] Implement the neutral action schema and dispatch-to-browser logic for `navigate`/`click`/`type_text`/`scroll`/`read_page`/`go_back`/`finish` in `app/agent/tools.py` (contracts/agent-tools.md FR-002)
 - [ ] T014 [P] Unit tests for action dispatch, including `finish` validity rules and stale-element error handling, in `tests/unit/test_tools_dispatch.py` — write first, must fail before T013 complete
 - [ ] T015 [P] Write the system prompt (honest reporting requirement, public-pages-only / no-login boundary) in `app/agent/prompts.py` (constitution Principle II, V; contracts/agent-tools.md no-login boundary)
-- [ ] T016 Implement `RunLogger` managing the `run.json` / `log.jsonl` / `screenshots/` / `report.md` / `data.json` artifact lifecycle in `app/agent/logger.py` (data-model.md ArtifactSet; constitution Principle V) — depends on T007, T013
-- [ ] T017 [P] Unit tests confirming all five artifact files exist and are internally consistent for completed, failed, and incomplete runs, in `tests/unit/test_logger.py` — write first, must fail before T016 complete
-- [ ] T018 Implement `RunManager` — single-concurrency lock, daily quota tracking, run history query, and seeded-sample injection at startup — in `app/runner.py` (data-model.md RunManager; constitution Principle VII; research.md §3–4) — depends on T005, T016
-- [ ] T019 [P] Unit tests for `RunManager` concurrency rejection, quota rejection, and seeded-sample injection in `tests/unit/test_runner.py` — write first, must fail before T018 complete
+- [ ] T016 Implement `RunLogger` managing the `run.json` / `log.jsonl` / `screenshots/` / `report.md` / `data.json` artifact lifecycle in `app/agent/logger.py` (data-model.md ArtifactSet; constitution Principle V), ensuring no exception text or request/response payload written to any artifact ever contains the configured API key value (data-model.md ArtifactSet validation rules; SC-007) — depends on T007, T013
+- [ ] T017 [P] Unit tests confirming all five artifact files exist and are internally consistent for completed, failed, and incomplete runs, AND that none of the five files contain the configured API key value (scan artifact contents for the secret string), in `tests/unit/test_logger.py` — write first, must fail before T016 complete
+- [ ] T018 Implement `RunManager` — single-concurrency lock, daily quota tracking, provider-readiness check (rejecting a new run before any browser/LLM call if `config.is_provider_ready()` is `false`), run history query, and seeded-sample injection at startup — in `app/runner.py` (data-model.md RunManager; constitution Principle VII; research.md §3–4; FR-017) — depends on T005, T016
+- [ ] T019 [P] Unit tests for `RunManager` concurrency rejection, quota rejection, provider-not-ready rejection (clear configuration-error message, no browser/LLM call attempted), and seeded-sample injection in `tests/unit/test_runner.py` — write first, must fail before T018 complete
 - [ ] T020 Add one real, previously-executed run's full artifact set under `app/samples/` for startup seeding (research.md §4; FR-006) — depends on T016
 
 **Checkpoint**: Foundation ready — config, LLM abstraction, resilient browser snapshotting, action dispatch, verifiable artifact logging, and run throttling all exist and are independently tested. User story implementation can now begin.
@@ -100,7 +100,7 @@ Single project per [plan.md](./plan.md) Structure Decision: `app/` at repository
 ### Tests for User Story 2
 
 - [ ] T031 [P] [US2] Web test: `GET /` lists the seeded sample run on a fresh instance with zero user-triggered runs, in `tests/web/test_dashboard_home.py` (contracts/web-api.md; FR-006/SC-004)
-- [ ] T032 [P] [US2] Web test: `POST /run` is rejected (not queued) while a run is `in_progress` or the daily quota is exhausted, in `tests/web/test_run_trigger.py` (contracts/web-api.md; FR-012/FR-013)
+- [ ] T032 [P] [US2] Web test: `POST /run` is rejected (not queued) while a run is `in_progress`, the daily quota is exhausted, or the configured provider's API key is missing (clear configuration-error message, no run started), in `tests/web/test_run_trigger.py` (contracts/web-api.md; FR-012/FR-013/FR-017)
 - [ ] T033 [P] [US2] Web test: `GET /runs/{id}`, `GET /api/runs`, `GET /api/runs/{id}`, and `GET /artifacts/{run_id}/{path}` return correct data, 404 on unknown IDs, and reject path traversal, in `tests/web/test_run_detail_api.py` (contracts/web-api.md)
 - [ ] T034 [P] [US2] Web test: `GET /healthz` returns 200 with no credentials required, in `tests/web/test_health.py` (FR-015)
 
@@ -109,8 +109,8 @@ Single project per [plan.md](./plan.md) Structure Decision: `app/` at repository
 - [ ] T035 [P] [US2] Create the shared Jinja2 base template in `app/web/templates/base.html`
 - [ ] T036 [US2] Create the dashboard home template (trigger form, preset-button placeholders, history list) in `app/web/templates/index.html` — depends on T035
 - [ ] T037 [US2] Create the run detail template (status, steps, screenshots) in `app/web/templates/run.html` — depends on T035
-- [ ] T038 [US2] Implement the FastAPI app with `GET /`, `GET /runs/{run_id}`, `POST /run`, `GET /api/status`, `GET /api/runs`, `GET /api/runs/{run_id}`, `GET /artifacts/{run_id}/{path}`, `GET /healthz` in `app/web/server.py` (contracts/web-api.md) — depends on T018, T029, T036, T037
-- [ ] T039 [US2] Wire `POST /run` to `RunManager` with start-URL validation and synchronous rejection when busy or quota-exhausted, in `app/web/server.py` (FR-012/FR-013) — depends on T038
+- [ ] T038 [US2] Implement the FastAPI app with `GET /`, `GET /runs/{run_id}`, `POST /run`, `GET /api/status` (including a `provider_ready` field), `GET /api/runs`, `GET /api/runs/{run_id}`, `GET /artifacts/{run_id}/{path}`, `GET /healthz` in `app/web/server.py` (contracts/web-api.md) — depends on T018, T029, T036, T037
+- [ ] T039 [US2] Wire `POST /run` to `RunManager` with start-URL validation and synchronous rejection when busy, quota-exhausted, or the provider is not ready (missing API key), in `app/web/server.py` (FR-012/FR-013/FR-017) — depends on T038
 - [ ] T040 [US2] Implement client-side polling of `GET /api/runs/{run_id}` on an interval in `app/web/templates/run.html` so the detail page reflects new steps without a manual reload (User Story 2, Acceptance Scenario 2) — depends on T037, T038
 - [ ] T041 [US2] Ensure `app/web/server.py` startup injects the seeded sample run from `app/samples/` via `RunManager` before serving requests — depends on T018, T020, T038
 
@@ -127,12 +127,12 @@ Single project per [plan.md](./plan.md) Structure Decision: `app/` at repository
 ### Tests for User Story 3
 
 - [ ] T042 [P] [US3] Unit tests for preset task definitions (key/label/goal/start_url fields present and valid) in `tests/unit/test_presets.py` (FR-007)
-- [ ] T043 [P] [US3] CLI tests: `--list-presets` prints available presets without triggering a run; `--preset <key>` exits 0 and produces the full artifact set, in `tests/unit/test_cli.py` (contracts/cli.md)
+- [ ] T043 [P] [US3] CLI tests: `--list-presets` prints available presets without triggering a run; `--preset <key>` exits 0 and produces the full artifact set; invoking any run-triggering flag with no configured provider API key exits non-zero with a clear message and starts no run, in `tests/unit/test_cli.py` (contracts/cli.md; FR-017)
 
 ### Implementation for User Story 3
 
 - [ ] T044 [P] [US3] Define preset tasks (e.g. a quote-scraping preset and a Hacker News preset) in `app/tasks.py`, targeting stable public pages (data-model.md PresetTask; research.md §6)
-- [ ] T045 [US3] Implement `--preset`, `--goal`/`--start-url`, and `--list-presets` CLI flags dispatching through `RunManager` in `app/cli.py` (contracts/cli.md) — depends on T029, T044
+- [ ] T045 [US3] Implement `--preset`, `--goal`/`--start-url`, and `--list-presets` CLI flags dispatching through `RunManager` (including the provider-readiness rejection) in `app/cli.py` (contracts/cli.md; FR-017) — depends on T029, T044
 - [ ] T046 [US3] Add preset-task buttons to `app/web/templates/index.html`, submitting via `data-*` attributes and `addEventListener` rather than inline `onclick` (avoids the quoting bug documented in the reference PDF) — depends on T036, T044
 - [ ] T047 [US3] Wire preset-button submissions to `POST /run` with the preset's goal/start_url pre-filled in `app/web/server.py` — depends on T038, T044, T046
 
