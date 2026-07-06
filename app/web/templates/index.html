@@ -10,6 +10,32 @@
     <input type="text" id="goal" name="goal" placeholder="e.g. collect all humor-tagged quotes" required />
     <label for="start_url">Start URL</label>
     <input type="text" id="start_url" name="start_url" placeholder="https://example.com" required />
+
+    <fieldset class="llm-source">
+      <legend>LLM credential</legend>
+      <label>
+        <input type="radio" name="llm_source" value="default" id="llm-source-default" checked />
+        Use server default
+        {% if not provider_ready %}<span class="error">(not configured — please use your own key)</span>{% endif %}
+      </label>
+      <label>
+        <input type="radio" name="llm_source" value="custom" id="llm-source-custom" />
+        Use my own key
+      </label>
+
+      <div id="custom-key-fields" style="display:none;">
+        <label for="llm_provider">Provider</label>
+        <select name="llm_provider" id="llm_provider">
+          <option value="anthropic">Anthropic</option>
+          <option value="openai">OpenAI</option>
+        </select>
+        <label for="llm_api_key">API Key</label>
+        <input type="password" name="llm_api_key" id="llm_api_key" placeholder="sk-..." autocomplete="off" />
+        <p><small>Your key is used only for this run, kept in your browser's session storage
+        for convenience, and is never stored on the server or written to any log/report.</small></p>
+      </div>
+    </fieldset>
+
     <button type="submit">Start Run</button>
   </form>
 
@@ -42,6 +68,51 @@
 </section>
 
 <script>
+  (function () {
+    var STORAGE_KEY = 'baa_llm_custom_key_v1';
+    var customFields = document.getElementById('custom-key-fields');
+    var providerSelect = document.getElementById('llm_provider');
+    var apiKeyInput = document.getElementById('llm_api_key');
+    var defaultRadio = document.getElementById('llm-source-default');
+    var customRadio = document.getElementById('llm-source-custom');
+    var serverProviderReady = {{ 'true' if provider_ready else 'false' }};
+
+    function updateVisibility() {
+      customFields.style.display = customRadio.checked ? 'block' : 'none';
+    }
+    defaultRadio.addEventListener('change', updateVisibility);
+    customRadio.addEventListener('change', updateVisibility);
+
+    // Restore a previously entered custom key from this browser tab's session only —
+    // never sent anywhere except back to this same server when the form is submitted.
+    try {
+      var saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        var data = JSON.parse(saved);
+        providerSelect.value = data.provider || 'anthropic';
+        apiKeyInput.value = data.apiKey || '';
+        customRadio.checked = true;
+      } else if (!serverProviderReady) {
+        // Nudge visitors toward "custom" if the operator hasn't configured a key.
+        customRadio.checked = true;
+      }
+    } catch (e) { /* sessionStorage unavailable — fall back to manual entry */ }
+    updateVisibility();
+
+    document.getElementById('trigger-form').addEventListener('submit', function () {
+      try {
+        if (customRadio.checked) {
+          sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+            provider: providerSelect.value,
+            apiKey: apiKeyInput.value
+          }));
+        } else {
+          sessionStorage.removeItem(STORAGE_KEY);
+        }
+      } catch (e) { /* ignore storage failures */ }
+    });
+  })();
+
   document.querySelectorAll('.preset-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       document.getElementById('goal').value = btn.getAttribute('data-goal');

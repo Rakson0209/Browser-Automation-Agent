@@ -62,6 +62,14 @@ The dashboard shows a built-in example run (`app/samples/seed-quotes-humor/`, a 
 anything — this guarantees there's always something verifiable to look at, since the
 `app/runs/` directory is ephemeral across redeploys on most PaaS platforms.
 
+**Bring your own key**: the trigger form has a "Use server default" / "Use my own key"
+toggle. On a public deployment, a visitor who doesn't want to (or shouldn't) spend the
+operator's own budget can switch to "custom," pick a provider, and paste in their own API
+key. That key is used only for that one run, is remembered in the browser's own
+`sessionStorage` for convenience (never sent anywhere except back to this server when
+triggering a run), and is never written to disk, a session store, or any log/report on
+the server (constitution Principle II).
+
 **CLI:**
 
 ```bash

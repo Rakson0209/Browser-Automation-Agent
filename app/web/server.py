@@ -12,7 +12,7 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import Configuration, load_config
+from app.config import SUPPORTED_PROVIDERS, Configuration, load_config
 from app.runner import RunManager, RunRejected
 from app.tasks import PRESETS
 
@@ -48,6 +48,7 @@ def create_app(
             {
                 "runs": manager.list_runs(),
                 "presets": app.state.presets,
+                "provider_ready": manager.provider_ready,
                 "error": None,
             },
         )
@@ -60,31 +61,46 @@ def create_app(
         return templates.TemplateResponse(request, "run.html", {"run": run})
 
     @app.post("/run")
-    def trigger_run(request: Request, goal: str = Form(...), start_url: str = Form(...)):
+    def trigger_run(
+        request: Request,
+        goal: str = Form(...),
+        start_url: str = Form(...),
+        llm_source: str = Form("default"),
+        llm_provider: str = Form(""),
+        llm_api_key: str = Form(""),
+    ):
+        def _error(message: str, status_code: int):
+            return templates.TemplateResponse(
+                request,
+                "index.html",
+                {
+                    "runs": manager.list_runs(),
+                    "presets": app.state.presets,
+                    "provider_ready": manager.provider_ready,
+                    "error": message,
+                },
+                status_code=status_code,
+            )
+
         if not _looks_like_url(start_url):
-            return templates.TemplateResponse(
-                request,
-                "index.html",
-                {
-                    "runs": manager.list_runs(),
-                    "presets": app.state.presets,
-                    "error": f"Invalid start URL: {start_url!r}",
-                },
-                status_code=400,
-            )
+            return _error(f"Invalid start URL: {start_url!r}", 400)
+
+        override_provider: Optional[str] = None
+        override_api_key: Optional[str] = None
+        if llm_source == "custom":
+            if llm_provider not in SUPPORTED_PROVIDERS:
+                return _error("Please choose a valid LLM provider for your custom key.", 400)
+            if not llm_api_key:
+                return _error("Please enter your API key, or switch to the server default.", 400)
+            override_provider = llm_provider
+            override_api_key = llm_api_key
+
         try:
-            run = manager.trigger_run_background(goal, start_url)
-        except RunRejected as exc:
-            return templates.TemplateResponse(
-                request,
-                "index.html",
-                {
-                    "runs": manager.list_runs(),
-                    "presets": app.state.presets,
-                    "error": str(exc),
-                },
-                status_code=409,
+            run = manager.trigger_run_background(
+                goal, start_url, override_provider=override_provider, override_api_key=override_api_key
             )
+        except RunRejected as exc:
+            return _error(str(exc), 409)
         return RedirectResponse(url=f"/runs/{run.run_id}", status_code=303)
 
     @app.get("/api/status")

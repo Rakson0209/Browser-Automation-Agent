@@ -7,13 +7,14 @@ from __future__ import annotations
 import json
 import shutil
 import threading
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from datetime import date
 
 from app.agent.agent import run_agent_loop
 from app.agent.logger import Run, RunLogger
-from app.config import Configuration
+from app.config import SUPPORTED_PROVIDERS, Configuration
 
 
 class RunRejected(Exception):
@@ -65,10 +66,21 @@ class RunManager:
             "provider_ready": self.provider_ready,
         }
 
-    def _reserve(self, goal: str, start_url: str) -> Run:
+    def _reserve(
+        self,
+        goal: str,
+        start_url: str,
+        override_provider: Optional[str] = None,
+        override_api_key: Optional[str] = None,
+    ) -> Run:
         """Reserve a run slot. Raises RunRejected — never queues — if busy, quota
-        exhausted, or the configured provider's API key is missing (FR-012, FR-013,
-        FR-017). This check always runs before any browser/LLM call is attempted.
+        exhausted, or there is no usable LLM credential (FR-012, FR-013, FR-017, FR-018).
+        This check always runs before any browser/LLM call is attempted.
+
+        If ``override_provider``/``override_api_key`` are supplied (a visitor's "bring
+        your own key" — constitution Principle II), readiness is judged on THAT
+        credential instead of the server's own configuration, and the resolved Run
+        records the effective provider actually used.
         """
         with self._lock:
             self._reset_quota_if_new_day()
@@ -76,11 +88,22 @@ class RunManager:
                 raise RunRejected("A run is already in progress")
             if self._runs_started_today >= self.config.daily_run_limit:
                 raise RunRejected("Daily run limit reached")
-            if not self.provider_ready:
-                raise RunRejected(
-                    f"Configured provider {self.config.llm_provider!r} has no API key set"
-                )
-            run = Run.new(goal=goal, start_url=start_url, provider=self.config.llm_provider)
+
+            if override_provider is not None:
+                if override_provider not in SUPPORTED_PROVIDERS:
+                    raise RunRejected(f"Unsupported LLM provider: {override_provider!r}")
+                if not override_api_key:
+                    raise RunRejected("A custom API key is required when using your own key")
+                effective_provider = override_provider
+            else:
+                if not self.provider_ready:
+                    raise RunRejected(
+                        f"Configured provider {self.config.llm_provider!r} has no API "
+                        "key set — supply your own key or ask the operator to configure one"
+                    )
+                effective_provider = self.config.llm_provider
+
+            run = Run.new(goal=goal, start_url=start_url, provider=effective_provider)
             self._active_run_id = run.run_id
             self._runs_started_today += 1
             return run
@@ -89,11 +112,28 @@ class RunManager:
         with self._lock:
             self._active_run_id = None
 
-    def _make_executor(self) -> Callable[[Run], None]:
+    def _make_executor(
+        self,
+        override_provider: Optional[str] = None,
+        override_api_key: Optional[str] = None,
+    ) -> Callable[[Run], None]:
         def executor(run: Run) -> None:
-            secrets = [self.config.anthropic_api_key, self.config.openai_api_key]
+            if override_provider is not None:
+                # Ephemeral, in-memory-only config for this one run — never persisted,
+                # never touches self.config (constitution Principle II).
+                effective_config = replace(
+                    self.config,
+                    llm_provider=override_provider,
+                    anthropic_api_key=override_api_key if override_provider == "anthropic" else None,
+                    openai_api_key=override_api_key if override_provider == "openai" else None,
+                )
+                secrets = [override_api_key]
+            else:
+                effective_config = self.config
+                secrets = [self.config.anthropic_api_key, self.config.openai_api_key]
+
             logger = RunLogger(run, runs_root=self.runs_root, secrets=secrets)
-            run_agent_loop(run, logger, self.config)
+            run_agent_loop(run, logger, effective_config)
 
         return executor
 
@@ -106,20 +146,39 @@ class RunManager:
             self._release()
         return run
 
-    def trigger_run(self, goal: str, start_url: str) -> Run:
+    def trigger_run(
+        self,
+        goal: str,
+        start_url: str,
+        override_provider: Optional[str] = None,
+        override_api_key: Optional[str] = None,
+    ) -> Run:
         """Synchronous entry point (used by the CLI): drives the run to completion
         before returning. Raises RunRejected under the same conditions as ``start_run``.
         """
-        return self.start_run(goal, start_url, self._make_executor())
+        run = self._reserve(goal, start_url, override_provider, override_api_key)
+        executor = self._make_executor(override_provider, override_api_key)
+        try:
+            executor(run)
+        finally:
+            self._release()
+        return run
 
-    def trigger_run_background(self, goal: str, start_url: str) -> Run:
+    def trigger_run_background(
+        self,
+        goal: str,
+        start_url: str,
+        override_provider: Optional[str] = None,
+        override_api_key: Optional[str] = None,
+    ) -> Run:
         """Asynchronous entry point (used by the web dashboard): reserves the slot
         synchronously (so rejection is immediate) then runs the agent loop on a
         background thread, returning right away so the caller can redirect to a
-        live-polling detail page.
+        live-polling detail page. Supports "bring your own key" the same way as
+        ``trigger_run`` (constitution Principle II).
         """
-        run = self._reserve(goal, start_url)
-        executor = self._make_executor()
+        run = self._reserve(goal, start_url, override_provider, override_api_key)
+        executor = self._make_executor(override_provider, override_api_key)
 
         def _target() -> None:
             try:

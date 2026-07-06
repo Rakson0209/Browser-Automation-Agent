@@ -100,6 +100,67 @@ def test_seeded_sample_is_injected_into_runs_dir(tmp_path):
     assert any(r["run_id"] == "seed-run-1" for r in runs)
 
 
+def test_custom_key_allows_run_even_when_server_provider_not_ready(tmp_path):
+    # Server has no configured key at all.
+    config = load_config({"LLM_PROVIDER": "anthropic", "DAILY_RUN_LIMIT": "3"})
+    manager = RunManager(config=config, runs_root=tmp_path / "runs")
+    assert manager.provider_ready is False
+
+    reserved = manager._reserve(
+        "goal", "https://example.test/", override_provider="openai", override_api_key="sk-visitor"
+    )
+    assert reserved.provider == "openai"
+    manager._release()
+
+
+def test_custom_key_missing_is_rejected(tmp_path):
+    manager = RunManager(config=_config(), runs_root=tmp_path / "runs")
+    try:
+        manager._reserve("goal", "https://example.test/", override_provider="openai", override_api_key="")
+        assert False, "expected RunRejected"
+    except RunRejected as exc:
+        assert "custom api key" in str(exc).lower()
+
+
+def test_custom_key_unsupported_provider_is_rejected(tmp_path):
+    manager = RunManager(config=_config(), runs_root=tmp_path / "runs")
+    try:
+        manager._reserve("goal", "https://example.test/", override_provider="gemini", override_api_key="sk-x")
+        assert False, "expected RunRejected"
+    except RunRejected as exc:
+        assert "unsupported" in str(exc).lower()
+
+
+def test_executor_with_override_never_touches_server_config_object(tmp_path):
+    manager = RunManager(config=_config(), runs_root=tmp_path / "runs")
+    executor = manager._make_executor(override_provider="openai", override_api_key="sk-visitor")
+
+    captured_configs = []
+    import app.runner as runner_module
+
+    original_run_agent_loop = runner_module.run_agent_loop
+
+    def spy(run, logger, config):
+        captured_configs.append(config)
+
+    runner_module.run_agent_loop = spy
+    try:
+        from app.agent.logger import Run
+
+        run = Run.new(goal="g", start_url="https://example.test/", provider="openai")
+        executor(run)
+    finally:
+        runner_module.run_agent_loop = original_run_agent_loop
+
+    assert len(captured_configs) == 1
+    used_config = captured_configs[0]
+    assert used_config.llm_provider == "openai"
+    assert used_config.openai_api_key == "sk-visitor"
+    # The server's own config object must be untouched (still anthropic/its own key)
+    assert manager.config.llm_provider == "anthropic"
+    assert used_config is not manager.config
+
+
 def test_seeding_is_idempotent_and_does_not_overwrite_existing_run(tmp_path):
     samples_root = tmp_path / "samples"
     sample_run_dir = samples_root / "seed-run-1"

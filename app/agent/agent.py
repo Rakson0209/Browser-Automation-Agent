@@ -33,86 +33,98 @@ def run_agent_loop(
     adapter = client.adapter
 
     try:
-        with BrowserSession(headless=True) as session:
-            try:
-                session.navigate(run.start_url)
-            except NavigationError as exc:
-                logger.finish(status="failed", result_summary=f"Could not reach start URL: {exc}")
-                return
+        _run_loop_body(run, logger, config, client, adapter)
+    except NavigationError as exc:
+        logger.finish(status="failed", result_summary=f"Navigation error: {exc}")
+    except Exception as exc:  # noqa: BLE001 - last-resort safety net (see docstring)
+        # A user-supplied "bring your own key" (constitution Principle II) is far more
+        # likely to be invalid/expired than the operator's own tested credential, and
+        # the SDKs raise their own exception types (auth errors, rate limits, etc.) that
+        # this loop cannot enumerate exhaustively. Without this net, such an error would
+        # leave the run stuck `in_progress` forever instead of a clear `failed` status
+        # (constitution Principle V — every run must reach an honest terminal state).
+        logger.finish(status="failed", result_summary=f"Unexpected error: {exc}")
 
-            if session.has_login_form():
+
+def _run_loop_body(run: Run, logger: RunLogger, config: Configuration, client, adapter) -> None:
+    with BrowserSession(headless=True) as session:
+        try:
+            session.navigate(run.start_url)
+        except NavigationError as exc:
+            logger.finish(status="failed", result_summary=f"Could not reach start URL: {exc}")
+            return
+
+        if session.has_login_form():
+            logger.finish(
+                status="failed",
+                result_summary=(
+                    "Start page requires login; automation is restricted to "
+                    "public, no-login pages."
+                ),
+            )
+            return
+
+        snapshot = session.snapshot()
+        messages = adapter.build_initial_messages(UserTurn(goal=run.goal, snapshot=snapshot))
+
+        step_index = 0
+        while step_index < config.max_steps_per_run:
+            step_index += 1
+            has_prior_steps = len(logger.run.steps) > 0
+
+            assistant_turn = client.decide(messages, system_prompt=SYSTEM_PROMPT)
+            messages = adapter.append_assistant_turn(messages, assistant_turn)
+
+            action_valid = True
+            try:
+                action_result = dispatch(
+                    session, assistant_turn.action, has_prior_steps=has_prior_steps
+                )
+            except InvalidActionError as exc:
+                action_result = f"invalid action: {exc}"
+                action_valid = False
+
+            login_detected = session.has_login_form()
+            new_snapshot = session.snapshot()
+            shot_path = logger.screenshot_path_for_step(step_index)
+            session.screenshot(shot_path)
+            logger.record_step(
+                StepRecord(
+                    index=step_index,
+                    observation=new_snapshot,
+                    decision=assistant_turn.decision,
+                    action=assistant_turn.action,
+                    action_result=action_result,
+                    screenshot_path=str(shot_path.relative_to(logger.run_dir)),
+                )
+            )
+
+            if login_detected:
                 logger.finish(
                     status="failed",
                     result_summary=(
-                        "Start page requires login; automation is restricted to "
-                        "public, no-login pages."
+                        "Encountered a page requiring login mid-run; stopping "
+                        "per the no-login boundary."
                     ),
                 )
                 return
 
-            snapshot = session.snapshot()
-            messages = adapter.build_initial_messages(UserTurn(goal=run.goal, snapshot=snapshot))
-
-            step_index = 0
-            while step_index < config.max_steps_per_run:
-                step_index += 1
-                has_prior_steps = len(logger.run.steps) > 0
-
-                assistant_turn = client.decide(messages, system_prompt=SYSTEM_PROMPT)
-                messages = adapter.append_assistant_turn(messages, assistant_turn)
-
-                action_valid = True
-                try:
-                    action_result = dispatch(
-                        session, assistant_turn.action, has_prior_steps=has_prior_steps
-                    )
-                except InvalidActionError as exc:
-                    action_result = f"invalid action: {exc}"
-                    action_valid = False
-
-                login_detected = session.has_login_form()
-                new_snapshot = session.snapshot()
-                shot_path = logger.screenshot_path_for_step(step_index)
-                session.screenshot(shot_path)
-                logger.record_step(
-                    StepRecord(
-                        index=step_index,
-                        observation=new_snapshot,
-                        decision=assistant_turn.decision,
-                        action=assistant_turn.action,
-                        action_result=action_result,
-                        screenshot_path=str(shot_path.relative_to(logger.run_dir)),
-                    )
+            if action_valid and assistant_turn.action.type == "finish":
+                logger.finish(
+                    status="completed",
+                    result_summary=assistant_turn.action.finish_summary,
                 )
+                return
 
-                if login_detected:
-                    logger.finish(
-                        status="failed",
-                        result_summary=(
-                            "Encountered a page requiring login mid-run; stopping "
-                            "per the no-login boundary."
-                        ),
-                    )
-                    return
-
-                if action_valid and assistant_turn.action.type == "finish":
-                    logger.finish(
-                        status="completed",
-                        result_summary=assistant_turn.action.finish_summary,
-                    )
-                    return
-
-                messages = adapter.append_tool_results_turn(
-                    messages,
-                    ToolResultsTurn(action_result=action_result, snapshot=new_snapshot),
-                )
-
-            logger.finish(
-                status="incomplete",
-                result_summary=(
-                    f"Reached the {config.max_steps_per_run}-step limit before the "
-                    "goal was completed."
-                ),
+            messages = adapter.append_tool_results_turn(
+                messages,
+                ToolResultsTurn(action_result=action_result, snapshot=new_snapshot),
             )
-    except NavigationError as exc:
-        logger.finish(status="failed", result_summary=f"Navigation error: {exc}")
+
+        logger.finish(
+            status="incomplete",
+            result_summary=(
+                f"Reached the {config.max_steps_per_run}-step limit before the "
+                "goal was completed."
+            ),
+        )
