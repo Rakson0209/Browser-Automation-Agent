@@ -1,50 +1,166 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: [TEMPLATE] → 1.0.0 (initial ratification)
+- Modified principles: n/a (first concrete adoption from template placeholders)
+- Added sections:
+  - Core Principles I–VII (AI-only workflow & semantic commits; no secrets/env-only config;
+    layered test-gated development; provider-agnostic LLM abstraction; verifiable/non-fabricated
+    artifacts; resilience via numbered-element snapshots; security boundaries & throttling)
+  - Technology & Platform Constraints
+  - Development Workflow & Documentation
+  - Governance
+- Removed sections: none (template placeholders replaced with concrete content)
+- Templates requiring updates:
+  - ✅ .specify/templates/plan-template.md (Constitution Check gate is generic — reads from this file, no edit needed)
+  - ✅ .specify/templates/spec-template.md (no principle-specific references — no edit needed)
+  - ✅ .specify/templates/tasks-template.md (no principle-specific references — no edit needed)
+  - ✅ .specify/templates/commands/*.md — none present beyond the speckit command markdown already reviewed
+- Follow-up TODOs: none — all placeholders resolved from Task3 - Browser Automation Agent.pdf
+-->
+
+# Browser Automation Agent Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. AI-Only Workflow with Semantic Commits
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+All implementation work MUST be produced through an AI coding agent workflow (Claude Code)
+end-to-end — architecture decisions, code, tests, and documentation are all driven by the
+agent loop of implement → run tests → fix, not by unreviewed hand-editing outside that loop.
+Git history MUST read as a coherent, semantic narrative progressing through skeleton/config →
+core agent loop → web layer → tests → docs/deployment, with each commit scoped to one
+logical change (e.g. `feat(agent): ...`, `test: ...`, `docs+build: ...`). Reusable agent
+behavior (e.g. "run one browser-automation goal end to end") SHOULD be packaged as a Claude
+Code Agent Skill so it is callable as a repeatable capability, not just inline code.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+**Rationale**: The project's grading and process integrity depend on the AI-only workflow
+being visible and auditable through commit history, not asserted after the fact.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### II. No Secrets, Environment-Only Configuration (NON-NEGOTIABLE)
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+API keys and any other credential MUST be supplied only via environment variables / `.env`
+(with `.env` excluded from version control) and MUST NEVER be committed, hard-coded, or
+logged. Automation targets are restricted to publicly accessible, no-login pages and
+self-built test pages; the agent MUST NOT attempt to bypass authentication or operate on
+systems requiring login or elevated access.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+**Rationale**: The project is graded and deployed publicly; leaked keys or credential-bypass
+behavior are unacceptable security and compliance failures, not stylistic concerns.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### III. Layered, Test-Gated Development
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Each architectural layer — browser automation (`browser.py`) → agent loop (`agent.py`,
+`llm.py`, `tools.py`) → web layer (`web/`, `runner.py`, `cli.py`) — MUST have passing
+automated tests before the next layer is built on top of it. Any bug fix or behavior change
+MUST be accompanied by a test that fails before the fix and passes after. Integration tests
+that exercise the browser MUST run offline against embedded/local HTML fixtures so the suite
+is deterministic and not dependent on third-party site availability.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+**Rationale**: The project's own history shows an external dependency
+(news.ycombinator.com) becoming unreliable mid-development; tests that depend on live
+third-party sites are inherently flaky and MUST be avoided in favor of local fixtures.
+
+### IV. Provider-Agnostic LLM Abstraction (NON-NEGOTIABLE)
+
+The agent's core loop MUST NOT depend on any single LLM vendor's request/response shape. A
+neutral turn representation (e.g. user turn / assistant turn / tool-results turn) MUST be
+defined, with vendor-specific adapters (Anthropic tool-use, OpenAI function-calling)
+translating to and from it. Vendor and model selection MUST be switchable purely through
+configuration (e.g. an `LLM_PROVIDER` environment variable), with zero changes required to
+the agent loop itself.
+
+**Rationale**: Avoiding vendor lock-in lets the project run on whichever API key is
+available and keeps grading/demo flexible across Anthropic and OpenAI.
+
+### V. Verifiable, Non-Fabricated Artifacts (NON-NEGOTIABLE)
+
+Every run MUST produce inspectable, structured artifacts: `run.json` (status/goal/step
+summaries/result), `log.jsonl` (per-step think → act → observe events), per-step
+screenshots, `report.md` (human-readable), and `data.json` (machine-readable extracted
+data). Reported outcomes MUST reflect actions actually executed and page state actually
+observed — fabricating, embellishing, or silently omitting failed steps is prohibited. Any
+seeded/demo run MUST be clearly derived from a real execution, not synthesized.
+
+**Rationale**: The deliverable's core value is that its output can be independently
+verified by a human or a script; unverifiable or fabricated output defeats the project's
+purpose.
+
+### VI. Resilience via Numbered Element Snapshots
+
+Interactive element targeting MUST use a numbered-element-snapshot mechanism (scanning
+visible interactive elements and tagging them with a stable `data-agent-id`) rather than
+hand-written CSS selectors tied to specific class names. The page state handed to the LLM
+SHOULD be a condensed, accessibility-style view (not raw DOM/HTML) to control token cost
+while preserving decision quality.
+
+**Rationale**: Hand-written selectors break under site redesigns and dynamic class names;
+numbered snapshots are the project's chosen mechanism for reliability against page changes,
+and also reduce token spend versus raw markup.
+
+### VII. Security Boundaries & Resource Throttling
+
+Public-facing deployments MUST enforce a daily run limit and single-concurrency execution
+(one run at a time) to bound cost and prevent resource exhaustion on constrained containers.
+Any environment exposed publicly MUST be containerized (Docker, based on an official
+Playwright browser image) rather than run bare. Automation scope remains limited to public,
+no-login pages per Principle II.
+
+**Rationale**: A publicly reachable trigger endpoint without throttling is an open invitation
+to cost/resource abuse; containerization keeps browser + system dependencies reproducible
+across local and deployed environments.
+
+## Technology & Platform Constraints
+
+The following stack is mandated for this project; substituting any element requires
+explicit justification recorded in the relevant plan's Complexity Tracking section:
+
+- **Language**: Python 3.11.
+- **Browser automation**: Playwright (cross-browser, built-in auto-waiting, official
+  Docker image with browsers pre-installed).
+- **LLM SDKs**: Anthropic and OpenAI SDKs, accessed only through the neutral abstraction
+  required by Principle IV.
+- **Web service**: FastAPI + Uvicorn (async, lightweight, matches the agent's async loop;
+  built-in type validation).
+- **Templating**: Jinja2 server-side templates for the dashboard (no separate frontend
+  build pipeline).
+- **Containerization**: Docker, based on the official `mcr.microsoft.com/playwright/python`
+  image.
+- **Deployment platform**: Zeabur (or an equivalent PaaS that supports Dockerfile deploys,
+  injected environment variables/secrets, and a generated public domain).
+- **Testing**: pytest / pytest-asyncio, covering unit tests and offline integration tests
+  per Principle III.
+
+## Development Workflow & Documentation
+
+- Development MUST proceed in the layered order: skeleton & config → core agent loop
+  (browser + LLM tool-use + execution logging) → web dashboard + run coordinator + CLI →
+  automated tests → docs & deployment — matching Principle III's test gate at each step.
+- The README MUST explain how to run and verify the system, state key assumptions made
+  during development, and describe how the AI workflow was used to build it.
+- Known limitations (e.g. ephemeral filesystem storage on redeploy, single-run concurrency,
+  no-login-only scope) MUST be documented explicitly rather than left implicit, along with
+  any mitigation in place (e.g. a seeded demo run to guarantee content on first load).
+- A one-click preset-task entry point and a CLI entry point MUST both remain available for
+  demonstration and verification purposes.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes any conflicting ad-hoc practice for this project. All plans,
+specs, and task lists produced by the speckit workflow MUST pass the Constitution Check
+gate before implementation proceeds; any violation MUST be justified in the plan's
+Complexity Tracking table or the design MUST be simplified to comply.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Amendment procedure**: Amendments are made by editing this file directly, updating the
+Sync Impact Report at the top of the file, and propagating any required changes to
+dependent templates (`plan-template.md`, `spec-template.md`, `tasks-template.md`, command
+files) in the same change.
+
+**Versioning policy**: Semantic versioning applies to this document —
+MAJOR for backward-incompatible principle removals/redefinitions, MINOR for new principles
+or materially expanded guidance, PATCH for clarifications and wording fixes.
+
+**Compliance review**: Every `/speckit-plan` run MUST re-check the Constitution Check gate
+after Phase 1 design, and any reviewer of generated plans/tasks MUST verify they do not
+violate Principles II, IV, or V (the NON-NEGOTIABLE items) before approving implementation.
+
+**Version**: 1.0.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06
