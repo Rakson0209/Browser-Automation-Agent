@@ -331,7 +331,9 @@ class LLMClient:
         if self.config.llm_provider == "anthropic":
             import anthropic
 
-            self._sdk_client = anthropic.Anthropic(api_key=self.config.anthropic_api_key)
+            self._sdk_client = anthropic.Anthropic(
+                api_key=self.config.anthropic_api_key, base_url=self.config.anthropic_base_url
+            )
         else:
             import openai
 

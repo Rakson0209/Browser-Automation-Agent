@@ -109,6 +109,82 @@ def test_custom_key_invalid_provider_is_rejected_with_400(tmp_path):
     assert app.state.manager.list_runs() == []
 
 
+def test_custom_key_with_deepseek_base_url_and_model_reaches_the_agent_loop(tmp_path, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        "app.runner.run_agent_loop",
+        lambda run, logger, config: captured.update(
+            base_url=config.openai_base_url, model=config.active_model()
+        ),
+    )
+
+    config = load_config({"LLM_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "sk-test", "DAILY_RUN_LIMIT": "5"})
+    app = create_app(config=config, runs_root=tmp_path / "runs", samples_root=None)
+    client = TestClient(app, follow_redirects=False)
+
+    response = client.post(
+        "/run",
+        data={
+            "goal": "g",
+            "start_url": "https://example.test/",
+            "llm_source": "custom",
+            "llm_provider": "openai",
+            "llm_api_key": "sk-deepseek-visitor",
+            "llm_base_url": "https://api.deepseek.com",
+            "llm_model": "deepseek-chat",
+        },
+    )
+    assert response.status_code == 303
+
+    import time
+
+    for _ in range(50):
+        if "base_url" in captured:
+            break
+        time.sleep(0.02)
+    assert captured.get("base_url") == "https://api.deepseek.com"
+    assert captured.get("model") == "deepseek-chat"
+
+
+def test_custom_key_with_localhost_base_url_is_rejected(tmp_path):
+    config = load_config({"LLM_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "sk-test", "DAILY_RUN_LIMIT": "5"})
+    app = create_app(config=config, runs_root=tmp_path / "runs", samples_root=None)
+    client = TestClient(app)
+
+    response = client.post(
+        "/run",
+        data={
+            "goal": "g",
+            "start_url": "https://example.test/",
+            "llm_source": "custom",
+            "llm_provider": "openai",
+            "llm_api_key": "sk-visitor",
+            "llm_base_url": "http://localhost:11434",
+        },
+    )
+    assert response.status_code == 400
+    assert app.state.manager.list_runs() == []
+
+
+def test_custom_key_with_private_ip_base_url_is_rejected(tmp_path):
+    config = load_config({"LLM_PROVIDER": "anthropic", "ANTHROPIC_API_KEY": "sk-test", "DAILY_RUN_LIMIT": "5"})
+    app = create_app(config=config, runs_root=tmp_path / "runs", samples_root=None)
+    client = TestClient(app)
+
+    response = client.post(
+        "/run",
+        data={
+            "goal": "g",
+            "start_url": "https://example.test/",
+            "llm_source": "custom",
+            "llm_provider": "openai",
+            "llm_api_key": "sk-visitor",
+            "llm_base_url": "http://192.168.1.10:8080",
+        },
+    )
+    assert response.status_code == 400
+
+
 def test_default_source_still_uses_server_provider(tmp_path, monkeypatch):
     captured = {}
     monkeypatch.setattr(

@@ -28,6 +28,8 @@ class Configuration:
     """Override for the 'openai' provider's endpoint — lets any OpenAI-compatible API
     (DeepSeek, Together.ai, a local vLLM server, ...) be used under LLM_PROVIDER=openai
     without any code change. None uses the OpenAI SDK's own default endpoint."""
+    anthropic_base_url: Optional[str] = None
+    """Same idea as openai_base_url, but for Anthropic-compatible proxies/gateways."""
 
     def is_provider_ready(self) -> bool:
         """FR-017: false when the selected provider's API key is missing."""
@@ -72,4 +74,5 @@ def load_config(env: Optional[Mapping[str, str]] = None) -> Configuration:
         daily_run_limit=_int("DAILY_RUN_LIMIT", 20),
         max_steps_per_run=_int("MAX_STEPS_PER_RUN", 15),
         openai_base_url=(source.get("OPENAI_BASE_URL") or None),
+        anthropic_base_url=(source.get("ANTHROPIC_BASE_URL") or None),
     )

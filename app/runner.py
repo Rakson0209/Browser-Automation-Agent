@@ -116,17 +116,29 @@ class RunManager:
         self,
         override_provider: Optional[str] = None,
         override_api_key: Optional[str] = None,
+        override_base_url: Optional[str] = None,
+        override_model: Optional[str] = None,
     ) -> Callable[[Run], None]:
         def executor(run: Run) -> None:
             if override_provider is not None:
                 # Ephemeral, in-memory-only config for this one run — never persisted,
                 # never touches self.config (constitution Principle II).
-                effective_config = replace(
-                    self.config,
-                    llm_provider=override_provider,
-                    anthropic_api_key=override_api_key if override_provider == "anthropic" else None,
-                    openai_api_key=override_api_key if override_provider == "openai" else None,
-                )
+                overrides = {
+                    "llm_provider": override_provider,
+                    "anthropic_api_key": override_api_key if override_provider == "anthropic" else None,
+                    "openai_api_key": override_api_key if override_provider == "openai" else None,
+                }
+                if override_base_url:
+                    if override_provider == "openai":
+                        overrides["openai_base_url"] = override_base_url
+                    else:
+                        overrides["anthropic_base_url"] = override_base_url
+                if override_model:
+                    if override_provider == "openai":
+                        overrides["openai_model"] = override_model
+                    else:
+                        overrides["anthropic_model"] = override_model
+                effective_config = replace(self.config, **overrides)
                 secrets = [override_api_key]
             else:
                 effective_config = self.config
@@ -152,12 +164,16 @@ class RunManager:
         start_url: str,
         override_provider: Optional[str] = None,
         override_api_key: Optional[str] = None,
+        override_base_url: Optional[str] = None,
+        override_model: Optional[str] = None,
     ) -> Run:
         """Synchronous entry point (used by the CLI): drives the run to completion
         before returning. Raises RunRejected under the same conditions as ``start_run``.
         """
         run = self._reserve(goal, start_url, override_provider, override_api_key)
-        executor = self._make_executor(override_provider, override_api_key)
+        executor = self._make_executor(
+            override_provider, override_api_key, override_base_url, override_model
+        )
         try:
             executor(run)
         finally:
@@ -170,15 +186,21 @@ class RunManager:
         start_url: str,
         override_provider: Optional[str] = None,
         override_api_key: Optional[str] = None,
+        override_base_url: Optional[str] = None,
+        override_model: Optional[str] = None,
     ) -> Run:
         """Asynchronous entry point (used by the web dashboard): reserves the slot
         synchronously (so rejection is immediate) then runs the agent loop on a
         background thread, returning right away so the caller can redirect to a
         live-polling detail page. Supports "bring your own key" the same way as
-        ``trigger_run`` (constitution Principle II).
+        ``trigger_run`` (constitution Principle II), including an optional custom
+        endpoint (``override_base_url``) and model (``override_model``) — e.g. to point
+        the "openai" provider at DeepSeek's OpenAI-compatible API.
         """
         run = self._reserve(goal, start_url, override_provider, override_api_key)
-        executor = self._make_executor(override_provider, override_api_key)
+        executor = self._make_executor(
+            override_provider, override_api_key, override_base_url, override_model
+        )
 
         def _target() -> None:
             try:

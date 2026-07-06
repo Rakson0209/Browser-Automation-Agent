@@ -161,6 +161,67 @@ def test_executor_with_override_never_touches_server_config_object(tmp_path):
     assert used_config is not manager.config
 
 
+def test_executor_with_override_applies_custom_base_url_and_model(tmp_path):
+    """e.g. pointing the 'openai' provider at DeepSeek with a specific model."""
+    manager = RunManager(config=_config(), runs_root=tmp_path / "runs")
+    executor = manager._make_executor(
+        override_provider="openai",
+        override_api_key="sk-deepseek-visitor",
+        override_base_url="https://api.deepseek.com",
+        override_model="deepseek-chat",
+    )
+
+    captured_configs = []
+    import app.runner as runner_module
+
+    original_run_agent_loop = runner_module.run_agent_loop
+
+    def spy(run, logger, config):
+        captured_configs.append(config)
+
+    runner_module.run_agent_loop = spy
+    try:
+        from app.agent.logger import Run
+
+        run = Run.new(goal="g", start_url="https://example.test/", provider="openai")
+        executor(run)
+    finally:
+        runner_module.run_agent_loop = original_run_agent_loop
+
+    used_config = captured_configs[0]
+    assert used_config.openai_base_url == "https://api.deepseek.com"
+    assert used_config.openai_model == "deepseek-chat"
+    assert used_config.active_model() == "deepseek-chat"
+    # Server's own config must remain untouched
+    assert manager.config.openai_base_url is None
+
+
+def test_executor_without_override_base_url_or_model_uses_server_defaults(tmp_path):
+    manager = RunManager(config=_config(), runs_root=tmp_path / "runs")
+    executor = manager._make_executor(override_provider="openai", override_api_key="sk-visitor")
+
+    captured_configs = []
+    import app.runner as runner_module
+
+    original_run_agent_loop = runner_module.run_agent_loop
+
+    def spy(run, logger, config):
+        captured_configs.append(config)
+
+    runner_module.run_agent_loop = spy
+    try:
+        from app.agent.logger import Run
+
+        run = Run.new(goal="g", start_url="https://example.test/", provider="openai")
+        executor(run)
+    finally:
+        runner_module.run_agent_loop = original_run_agent_loop
+
+    used_config = captured_configs[0]
+    assert used_config.openai_base_url is None
+    assert used_config.openai_model == manager.config.openai_model
+
+
 def test_seeding_is_idempotent_and_does_not_overwrite_existing_run(tmp_path):
     samples_root = tmp_path / "samples"
     sample_run_dir = samples_root / "seed-run-1"
