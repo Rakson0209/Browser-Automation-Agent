@@ -1,21 +1,18 @@
 <!--
 Sync Impact Report
-- Version change: [TEMPLATE] → 1.0.0 (initial ratification)
-- Modified principles: n/a (first concrete adoption from template placeholders)
-- Added sections:
-  - Core Principles I–VII (AI-only workflow & semantic commits; no secrets/env-only config;
-    layered test-gated development; provider-agnostic LLM abstraction; verifiable/non-fabricated
-    artifacts; resilience via numbered-element snapshots; security boundaries & throttling)
-  - Technology & Platform Constraints
-  - Development Workflow & Documentation
-  - Governance
-- Removed sections: none (template placeholders replaced with concrete content)
+- Version change: 1.0.0 → 1.1.0 (compute-profile constraint added)
+- Modified principles:
+  - VII. Security Boundaries & Resource Throttling — rationale expanded to reference the
+    CPU-only compute profile as an added reason for single-concurrency throttling
+- Added sections: none (new content added within existing "Technology & Platform
+  Constraints" section as a new "Compute profile" bullet)
+- Removed sections: none
 - Templates requiring updates:
-  - ✅ .specify/templates/plan-template.md (Constitution Check gate is generic — reads from this file, no edit needed)
+  - ✅ .specify/templates/plan-template.md (Constitution Check gate is generic — no edit needed)
   - ✅ .specify/templates/spec-template.md (no principle-specific references — no edit needed)
   - ✅ .specify/templates/tasks-template.md (no principle-specific references — no edit needed)
   - ✅ .specify/templates/commands/*.md — none present beyond the speckit command markdown already reviewed
-- Follow-up TODOs: none — all placeholders resolved from Task3 - Browser Automation Agent.pdf
+- Follow-up TODOs: none
 -->
 
 # Browser Automation Agent Constitution
@@ -107,7 +104,9 @@ no-login pages per Principle II.
 
 **Rationale**: A publicly reachable trigger endpoint without throttling is an open invitation
 to cost/resource abuse; containerization keeps browser + system dependencies reproducible
-across local and deployed environments.
+across local and deployed environments. Throttling to one run at a time is doubly important
+given the CPU-only Arm compute profile (see Technology & Platform Constraints), which has no
+GPU to fall back on for any parallelizable workload.
 
 ## Technology & Platform Constraints
 
@@ -127,6 +126,14 @@ explicit justification recorded in the relevant plan's Complexity Tracking secti
   image.
 - **Deployment platform**: Zeabur (or an equivalent PaaS that supports Dockerfile deploys,
   injected environment variables/secrets, and a generated public domain).
+- **Compute profile**: The deployment target is Arm-based (Ampere A1) CPU-only compute — no
+  GPU is available. All inference is performed remotely via the LLM provider APIs (Principle
+  IV), so no local model inference is required; however, all local work (Playwright/Chromium
+  rendering, image/screenshot handling, any other on-container processing) MUST run correctly
+  on CPU-only arm64 hardware with no assumption of CUDA/GPU acceleration. Container base
+  images and all dependencies MUST have arm64-compatible builds (e.g. the official Playwright
+  image's multi-arch manifest); any dependency without arm64 support MUST be replaced or
+  justified in the plan's Complexity Tracking section.
 - **Testing**: pytest / pytest-asyncio, covering unit tests and offline integration tests
   per Principle III.
 
@@ -163,4 +170,4 @@ or materially expanded guidance, PATCH for clarifications and wording fixes.
 after Phase 1 design, and any reviewer of generated plans/tasks MUST verify they do not
 violate Principles II, IV, or V (the NON-NEGOTIABLE items) before approving implementation.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06
+**Version**: 1.1.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06
