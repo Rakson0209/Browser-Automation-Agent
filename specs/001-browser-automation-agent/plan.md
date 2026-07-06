@@ -66,7 +66,7 @@ at a time; historical runs bounded by filesystem retention, not by a target user
 | V. Verifiable, Non-Fabricated Artifacts | Every run MUST produce run.json/log.jsonl/screenshots/report.md/data.json reflecting real execution | PASS — data-model.md's `Run`/`Step`/`ArtifactSet` entities and the runs contract enforce this; no code path may synthesize an artifact without a matching real step |
 | VI. Resilience via Numbered Element Snapshots | Element targeting MUST use numbered snapshots (`data-agent-id`), not brittle selectors | PASS — data-model.md's `ElementSnapshot` entity and the browser-layer contract require this |
 | VII. Security Boundaries & Resource Throttling | Public deployment MUST enforce daily run limit + single concurrency + containerization | PASS — data-model.md's `RunManager`/quota fields and the web contract's `/api/status` + `POST /run` behavior enforce this |
-| Tech & Platform Constraints | Stack MUST be Python 3.11 / Playwright / Anthropic+OpenAI SDKs / FastAPI+Uvicorn / Jinja2 / Docker (`mcr.microsoft.com/playwright/python`) / Zeabur / pytest, arm64 CPU-only compatible | PASS — Technical Context above matches exactly; no substitution proposed |
+| Tech & Platform Constraints | Stack MUST be Python 3.11 / Playwright / Anthropic+OpenAI SDKs / FastAPI+Uvicorn / Jinja2 / Docker (`python:3.11-slim-bookworm` + `playwright install --with-deps`) / Zeabur / pytest, arm64 CPU-only compatible | PASS — Technical Context above matches exactly; base image corrected post-implementation after a real arm64 deployment failure with the originally planned `mcr.microsoft.com/playwright/python` (amd64-only) — see research.md §5 |
 
 No violations identified. Complexity Tracking table is not needed.
 
@@ -122,7 +122,7 @@ tests/
 ├── llm/                     # Neutral-turn ↔ Anthropic/OpenAI adapter conversion tests — FR-016
 └── web/                     # Starlette TestClient: routes, API, error handling (e.g. missing key) — FR-016
 
-Dockerfile                  # Base: mcr.microsoft.com/playwright/python (arm64-compatible) — Tech Constraints
+Dockerfile                  # Base: python:3.11-slim-bookworm + playwright install --with-deps (arm64-compatible) — Tech Constraints
 requirements.txt
 .claude/skills/             # Claude Code Agent Skill wrapping "run one browser-automation goal"
 ```

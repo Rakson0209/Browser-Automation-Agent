@@ -144,7 +144,7 @@ Single project per [plan.md](./plan.md) Structure Decision: `app/` at repository
 
 **Purpose**: Deployment readiness and documentation spanning all user stories
 
-- [X] T048 [P] Write `Dockerfile` at repository root based on `mcr.microsoft.com/playwright/python` (arm64-compatible), running via `uvicorn` and honoring an injected `$PORT` (constitution Technology & Platform Constraints; research.md §5)
+- [X] T048 [P] Write `Dockerfile` at repository root (running via `uvicorn` and honoring an injected `$PORT`) — **originally based on `mcr.microsoft.com/playwright/python`; corrected to `python:3.11-slim-bookworm` + `playwright install --with-deps` in Phase 9 after a real arm64 deployment failure** (constitution Technology & Platform Constraints; research.md §5)
 - [X] T049 [P] Write `README.md` at repository root covering run/verify instructions, key assumptions, and how the AI-only workflow was used (constitution Development Workflow & Documentation)
 - [X] T050 [P] Package "run one browser-automation goal end to end" as a Claude Code Agent Skill under `.claude/skills/` (constitution Principle I)
 - [X] T051 Run the full test suite (`tests/unit`, `tests/integration`, `tests/llm`, `tests/web`) and confirm 100% pass with zero failures (FR-016; SC-008) — 63/63 passed
@@ -219,6 +219,38 @@ it's the same wire format, just a different host).
 **Checkpoint**: 78/78 tests passing; `LLM_PROVIDER=openai` + `OPENAI_BASE_URL` +
 `OPENAI_MODEL` lets the whole system run against DeepSeek (or any compatible API) with no
 code changes.
+
+---
+
+## Phase 9: Fix Zeabur Deployment — arm64 Base-Image Bug (Production Incident)
+
+**Purpose**: The first real Zeabur deployment attempt (T053) failed at container startup
+with `exec /usr/bin/sh: exec format error` — the canonical Linux symptom for "this binary
+was compiled for a different CPU architecture than the host." Root cause:
+`mcr.microsoft.com/playwright/python`, mandated by the original constitution/plan/research
+as "multi-arch," is actually amd64-only; it was never verified, only assumed from general
+familiarity with Microsoft's Playwright images.
+
+- [X] T068 Replace the `Dockerfile` base image with `python:3.11-slim-bookworm` (a
+  verified, genuinely multi-arch Docker Official Image) and install Chromium via
+  `python -m playwright install --with-deps chromium` instead of relying on a pre-baked,
+  architecture-specific browser layer
+- [X] T069 Fix a Dockerfile syntax defect surfaced while editing: a shell comment
+  (`#...`) embedded inside a backslash-continued `RUN` instruction is invalid — moved the
+  explanatory comment above the `RUN` block instead of inside it
+- [X] T070 [P] Amend constitution Technology & Platform Constraints (v1.2.0 → v1.2.1,
+  PATCH) to mandate the corrected base image and explicitly forbid
+  `mcr.microsoft.com/playwright/python`, recording the real-world failure as the reason
+- [X] T071 [P] Correct `research.md` §5, `plan.md` (Constitution Check table + project
+  structure comment), and `README.md`'s deployment section to match the corrected image
+  and document the lesson: verify an image's actual architecture support before mandating
+  it, don't infer multi-arch from a vendor's general reputation
+
+**Checkpoint**: Dockerfile no longer references the amd64-only image anywhere in code or
+docs; next Zeabur deployment attempt should be re-run by the user to confirm the fix
+(building/pushing to Zeabur is still outside what can be done autonomously from this
+sandbox — no Docker daemon available here either, so this fix is reasoned from the error
+message and known base-image architecture support, not build-tested locally).
 
 ---
 

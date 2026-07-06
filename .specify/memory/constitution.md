@@ -1,12 +1,13 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.0 → 1.2.0 (bring-your-own-key allowance added)
+- Version change: 1.2.0 → 1.2.1 (container base-image correction — bug fix, no new
+  principle/guidance, PATCH per versioning policy)
 - Modified principles:
-  - II. No Secrets, Environment-Only Configuration — loosened from "only via environment
-    variables" to also permit an optional, never-persisted, per-request user-supplied
-    LLM credential ("bring your own key") for web-triggered runs, so a public deployment
-    does not force every visitor to spend the operator's own key/budget. The
-    never-commit/never-log/never-persist-on-server invariant remains NON-NEGOTIABLE.
+  - Technology & Platform Constraints — Containerization bullet corrected:
+    `mcr.microsoft.com/playwright/python` is amd64-only (not multi-arch as previously
+    assumed) and MUST NOT be used; switched to the genuinely multi-arch official
+    `python` image + `playwright install --with-deps` at build time. Confirmed by an
+    actual Zeabur deployment failing with `exec format error` on the previous image.
 - Added sections: none
 - Removed sections: none
 - Templates requiring updates:
@@ -125,16 +126,20 @@ The following stack is mandated for this project; substituting any element requi
 explicit justification recorded in the relevant plan's Complexity Tracking section:
 
 - **Language**: Python 3.11.
-- **Browser automation**: Playwright (cross-browser, built-in auto-waiting, official
-  Docker image with browsers pre-installed).
+- **Browser automation**: Playwright (cross-browser, built-in auto-waiting).
 - **LLM SDKs**: Anthropic and OpenAI SDKs, accessed only through the neutral abstraction
   required by Principle IV.
 - **Web service**: FastAPI + Uvicorn (async, lightweight, matches the agent's async loop;
   built-in type validation).
 - **Templating**: Jinja2 server-side templates for the dashboard (no separate frontend
   build pipeline).
-- **Containerization**: Docker, based on the official `mcr.microsoft.com/playwright/python`
-  image.
+- **Containerization**: Docker, based on the official `python` Docker Library image (a
+  genuinely multi-arch manifest list), installing Chromium via `playwright install
+  --with-deps` at build time rather than a pre-baked, architecture-specific browser
+  layer. `mcr.microsoft.com/playwright/python` MUST NOT be used as the base image — it is
+  amd64-only today and fails with `exec format error` on arm64 hosts (confirmed by an
+  actual failed Zeabur deployment); any future base-image change MUST verify true
+  multi-arch (arm64) support before adoption, not assume it from documentation alone.
 - **Deployment platform**: Zeabur (or an equivalent PaaS that supports Dockerfile deploys,
   injected environment variables/secrets, and a generated public domain).
 - **Compute profile**: The deployment target is Arm-based (Ampere A1) CPU-only compute — no
@@ -181,4 +186,4 @@ or materially expanded guidance, PATCH for clarifications and wording fixes.
 after Phase 1 design, and any reviewer of generated plans/tasks MUST verify they do not
 violate Principles II, IV, or V (the NON-NEGOTIABLE items) before approving implementation.
 
-**Version**: 1.2.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06
+**Version**: 1.2.1 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06

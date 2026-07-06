@@ -1,15 +1,17 @@
-# Base image: official Playwright Python image — multi-arch (amd64 + arm64), browsers
-# and OS-level dependencies pre-installed. Matches the constitution's Compute Profile
-# constraint (Arm Ampere A1, CPU-only) and Technology & Platform Constraints.
-FROM mcr.microsoft.com/playwright/python:v1.49.0-noble
+# Base image: the official "python" Docker Library image is a genuinely multi-arch
+# manifest list (amd64, arm64/v8, ...) maintained by Docker's own library team — unlike
+# mcr.microsoft.com/playwright/python, which is amd64-only today. Matches the
+# constitution's Compute Profile constraint (Arm Ampere A1, CPU-only).
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
 COPY requirements.txt .
+# --with-deps runs Playwright's own OS-dependency installer (apt) for whatever
+# architecture this build actually runs on, so it works correctly on arm64 too — it
+# does NOT rely on a pre-baked, architecture-specific browser layer.
 RUN pip install --no-cache-dir -r requirements.txt \
-    # Re-run browser install to match the exact Playwright pip version above —
-    # the base image bundles browsers for its own build-time version only.
-    && python -m playwright install chromium
+    && python -m playwright install --with-deps chromium
 
 COPY app/ ./app/
 

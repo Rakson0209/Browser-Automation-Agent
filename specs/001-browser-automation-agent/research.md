@@ -70,19 +70,33 @@ non-fabrication rule, since it wouldn't correspond to a real execution).
 
 ## 5. arm64 / CPU-only compatibility
 
-**Decision**: Base the container image on the official `mcr.microsoft.com/playwright/python`
-image, which publishes multi-arch (amd64 + arm64) manifests, and pin the Playwright Python
-package version known to have a matching arm64 browser build. No GPU-accelerated rendering
-flags are used; Chromium runs in standard headless CPU mode.
+**Decision (revised after a real deployment failure)**: Base the container image on the
+official `python:3.11-slim-bookworm` image — a genuinely multi-arch manifest list
+maintained by Docker's own library team — and install Chromium via
+`python -m playwright install --with-deps chromium`, which runs Playwright's own
+OS-dependency installer (apt) for whatever architecture the build actually executes on. No
+GPU-accelerated rendering flags are used; Chromium runs in standard headless CPU mode.
 
-**Rationale**: Directly satisfies the constitution's Compute Profile constraint (Arm Ampere
-A1, CPU-only, no GPU) while still reusing the vendor-maintained image that bundles matching
-browser binaries, avoiding a hand-rolled arm64 Chromium build.
+**Original decision (superseded)**: This section originally specified
+`mcr.microsoft.com/playwright/python`, assumed to be multi-arch based on general
+familiarity with Microsoft's Playwright Docker images. That assumption was **wrong** for
+this specific language-flavored tag — a real Zeabur deployment failed with
+`exec /usr/bin/sh: exec format error` (the canonical architecture-mismatch symptom),
+confirming the image is amd64-only. This is recorded here as a lesson: **verify an image's
+architecture support directly (`docker manifest inspect`, or the vendor's own published
+platform list) before mandating it — don't infer multi-arch support from a base image's
+general reputation.**
 
-**Alternatives considered**: A custom Dockerfile installing Chromium from scratch (rejected
-— higher maintenance burden, risk of missing arm64 system dependencies that the official
-image already resolves); GPU-accelerated headless mode (not applicable — no GPU exists on
-the target compute).
+**Rationale**: The revised approach directly satisfies the constitution's Compute Profile
+constraint (Arm Ampere A1, CPU-only, no GPU) using an image whose multi-arch support is
+well-established (the Docker Official Images program), rather than a vendor image whose
+multi-arch status turned out to be unverified.
+
+**Alternatives considered**: A custom Dockerfile installing Chromium from scratch (this
+*is* effectively what `--with-deps` does, but via Playwright's own maintained installer
+rather than hand-rolled apt package lists — lower maintenance burden, same arm64
+correctness); GPU-accelerated headless mode (not applicable — no GPU exists on the target
+compute).
 
 ## 6. Offline-first browser test strategy
 

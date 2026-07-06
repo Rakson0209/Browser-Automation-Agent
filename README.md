@@ -127,12 +127,15 @@ net, the web API, presets, and the CLI).
 
 ## Deployment (Zeabur or an equivalent PaaS)
 
-The `Dockerfile` is based on the official `mcr.microsoft.com/playwright/python` image
-(multi-arch — this project's target compute is Arm-based, Ampere A1, CPU-only, no GPU; see
-the constitution's Compute Profile constraint), so browsers and OS dependencies are
-already present in the base layer. It re-runs `playwright install chromium` after `pip
-install` to make sure the browser binaries match the exact pip-installed Playwright
-version.
+The `Dockerfile` is based on the official `python:3.11-slim-bookworm` image — a genuinely
+multi-arch manifest list (this project's target compute is Arm-based, Ampere A1,
+CPU-only, no GPU; see the constitution's Compute Profile constraint) — and installs
+Chromium via `playwright install --with-deps`, which runs Playwright's own OS-dependency
+installer for whatever architecture the build actually runs on.
+
+> **Do not** base this on `mcr.microsoft.com/playwright/python`: that image is amd64-only
+> today. Using it produced a real Zeabur deployment failure (`exec /usr/bin/sh: exec
+> format error` — the classic architecture-mismatch symptom) before this was corrected.
 
 Configure these environment variables on the platform (never commit them):
 
@@ -145,11 +148,12 @@ Configure these environment variables on the platform (never commit them):
 
 The platform injects `$PORT`; the container's `CMD` already honors it.
 
-> **Note on this build**: the Dockerfile and deployment steps here were authored and
-> reviewed as part of this AI-only workflow, but the actual `docker build` / push to
-> Zeabur was not run from this development sandbox (no Docker daemon available here) —
-> that step is left for whoever has platform credentials to execute
-> (`specs/001-browser-automation-agent/tasks.md` T053).
+> **Note on this build**: the Dockerfile was authored without a local Docker daemon
+> available in the development sandbox, so it could not be build-tested before the first
+> real Zeabur deployment attempt — that attempt failed with an architecture mismatch (see
+> above), which is now fixed. If you hit further deploy failures, check the Zeabur build
+> logs for the actual error rather than assuming the Dockerfile is correct; it has still
+> only been verified via one real deployment attempt, not build-tested locally.
 
 ## AI-only development workflow
 
