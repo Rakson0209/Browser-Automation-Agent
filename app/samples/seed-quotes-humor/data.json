@@ -1,0 +1,58 @@
+{
+  "run_id": "seed-quotes-humor",
+  "goal": "Collect all humor-tagged quotes from quotes.toscrape.com, including any that appear on later pages.",
+  "start_url": "https://quotes.toscrape.com/tag/humor/",
+  "status": "completed",
+  "result_summary": "Collected 12 humor-tagged quotes across 2 pages.",
+  "step_count": 4,
+  "quotes": [
+    {
+      "tag": "humor",
+      "text": "“The person, be it gentleman or lady, who has not pleasure in a good novel, must be intolerably stupid.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“A day without sunshine is like, you know, night.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“Anyone who thinks sitting in church can make you a Christian must also think that sitting in a garage can make you a car.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“Beauty is in the eye of the beholder and it may be necessary from time to time to give a stupid or misinformed beholder a black eye.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“All you need is love. But a little chocolate now and then doesn't hurt.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“Remember, we're madly in love, so it's all right to kiss me anytime you feel like it.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“Some people never go crazy. What truly horrible lives they must lead.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“The trouble with having an open mind, of course, is that people will insist on coming along and trying to put things in it.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“Think left and think right and think low and think high. Oh, the thinks you can think up if only you try!”"
+    },
+    {
+      "tag": "humor",
+      "text": "“The reason I talk to myself is because I’m the only one whose answers I accept.”"
+    },
+    {
+      "tag": "humor",
+      "text": "“I am free of all prejudice. I hate everyone equally. ”"
+    },
+    {
+      "tag": "humor",
+      "text": "“A lady's imagination is very rapid; it jumps from admiration to love, from love to matrimony in a moment.”"
+    }
+  ]
+}
