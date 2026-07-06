@@ -96,3 +96,47 @@ docker run -p 8000:8000 --env-file .env browser-automation-agent
 
 Confirm `/healthz` responds and a preset run completes inside the container with no
 GPU-dependent code path invoked.
+
+## Validation Log (2026-07-06, implementation sandbox)
+
+Executed as part of `/speckit-implement` (T052). This sandbox had no live LLM API key
+and no Docker daemon available, so results are split accordingly:
+
+**Verified live in this environment:**
+
+- §1 Layer-by-layer test gate: `pytest tests/unit tests/llm tests/integration tests/web`
+  → **63/63 passed**, zero failures (SC-008).
+- §2 CLI: `python -m app.cli --list-presets` → prints both presets, no run triggered.
+  `python -m app.cli --preset quotes_humor` with no API key configured → rejected with
+  `Run rejected: Configured provider 'anthropic' has no API key set`, exit code 1 (FR-017)
+  — confirms the CLI's provider-readiness gate runs before any browser/LLM call.
+- §3 Dashboard: started `uvicorn app.web.server:app`; `GET /` shows the seeded
+  `seed-quotes-humor` run's goal text with zero prior interaction (SC-004); `GET
+  /api/status` reflects `provider_ready: false` when no key is set.
+- §4 Throttling: `POST /run` with no API key configured → `409` (FR-017); a malformed
+  `start_url` → `400`. Busy/quota rejection paths are additionally covered by
+  `tests/unit/test_runner.py` and `tests/web/test_run_trigger.py` (concurrency and quota
+  are hard to trigger live without a real long-running run, so those two are verified via
+  the automated suite instead of manually).
+- §5 No-login/failure boundaries: covered live by the automated integration suite
+  (`test_agent_loop_failed_url.py`, `test_agent_loop_login_boundary.py`) rather than a
+  manual run, for the same reason as above (deterministic, offline, repeatable).
+- §6 Health check: `GET /healthz` → `200 {"status": "ok"}`.
+
+**Not executable in this sandbox — left for whoever has the missing credential/tool:**
+
+- A full real, LLM-driven run via CLI or dashboard (steps 2–3's "expected outcome"
+  sections describing a `completed` run) requires a real `ANTHROPIC_API_KEY` or
+  `OPENAI_API_KEY`, which this sandbox does not have. The seeded sample run
+  (`app/samples/seed-quotes-humor/`) is a genuine prior execution of this exact scenario
+  (real Playwright session, real extracted quotes, real screenshots) and stands in as
+  evidence that the artifact pipeline works end-to-end; only the *LLM decision-making*
+  step itself is unverified live here (it is verified structurally via
+  `tests/llm/test_llm_adapters.py` and the scripted-LLM integration tests).
+- The Docker/arm64 sanity check requires a Docker daemon, which is not available in this
+  sandbox (`docker --version` → command not found). The `Dockerfile` was authored per the
+  constitution's Compute Profile constraint (official multi-arch Playwright base image,
+  re-running `playwright install` to match the pinned pip version) but has not been
+  build-tested.
+- T053 (actual deployment to Zeabur) requires platform account credentials this sandbox
+  does not have.
