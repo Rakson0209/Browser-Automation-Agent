@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Configuration, load_config
 from app.runner import RunManager, RunRejected
+from app.tasks import PRESETS
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -118,4 +119,4 @@ def create_app(
     return app
 
 
-app = create_app(samples_root=Path("app/samples"))
+app = create_app(samples_root=Path("app/samples"), presets=list(PRESETS))

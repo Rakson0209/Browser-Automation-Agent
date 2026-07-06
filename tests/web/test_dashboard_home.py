@@ -25,3 +25,20 @@ def test_fresh_instance_lists_seeded_sample_run(tmp_path):
     response = client.get("/")
     assert response.status_code == 200
     assert "seed goal" in response.text
+
+
+def test_preset_buttons_render_with_data_attributes_not_inline_onclick(tmp_path):
+    from app.tasks import PRESETS
+
+    app = create_app(
+        config=_config(), runs_root=tmp_path / "runs", samples_root=None, presets=list(PRESETS)
+    )
+    client = TestClient(app)
+
+    response = client.get("/")
+    assert response.status_code == 200
+    for preset in PRESETS:
+        assert f'data-goal="{preset.goal}"' in response.text
+        assert f'data-start-url="{preset.start_url}"' in response.text
+    assert "onclick=" not in response.text
+    assert "addEventListener" in response.text
