@@ -335,7 +335,9 @@ class LLMClient:
         else:
             import openai
 
-            self._sdk_client = openai.OpenAI(api_key=self.config.openai_api_key)
+            self._sdk_client = openai.OpenAI(
+                api_key=self.config.openai_api_key, base_url=self.config.openai_base_url
+            )
         return self._sdk_client
 
     def decide(

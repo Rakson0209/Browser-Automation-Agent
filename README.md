@@ -18,8 +18,9 @@ research, data model, contracts, tasks) and the project's governing principles a
    the model can target elements by number instead of a brittle CSS selector — this
    keeps the agent resilient to site redesigns and dynamic class names.
 2. **Decide**: the numbered snapshot plus the goal are sent to the configured LLM
-   provider (Anthropic or OpenAI, switchable via `LLM_PROVIDER`) via a neutral tool-use
-   abstraction, which returns exactly one next action: `navigate`, `click`, `type_text`,
+   provider (Anthropic or OpenAI — or any OpenAI-compatible endpoint, see below —
+   switchable via `LLM_PROVIDER`) via a neutral tool-use abstraction, which returns
+   exactly one next action: `navigate`, `click`, `type_text`,
    `scroll`, `read_page`, `go_back`, or `finish`.
 3. **Act**: the action is dispatched against the real browser, a screenshot is taken, and
    the step (decision → action → observation) is appended to the run's log.
@@ -70,6 +71,23 @@ key. That key is used only for that one run, is remembered in the browser's own
 triggering a run), and is never written to disk, a session store, or any log/report on
 the server (constitution Principle II).
 
+**Using DeepSeek (or any other OpenAI-compatible API)**: `LLM_PROVIDER=openai` doesn't
+have to mean OpenAI itself — set `OPENAI_BASE_URL` to any endpoint that speaks the same
+chat-completions wire format (DeepSeek, Together.ai, a local vLLM server, ...):
+
+```bash
+LLM_PROVIDER=openai
+OPENAI_API_KEY=<your DeepSeek key>
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-chat
+```
+
+No code changes needed — this applies to both the server's own default credential and to
+"bring your own key" visitors who pick "openai" (they inherit whatever `OPENAI_BASE_URL`
+the operator configured, using their own key against that same endpoint). The web form
+itself does not let a visitor specify an arbitrary base URL, to avoid turning the trigger
+endpoint into an open-ended request proxy — only the operator's env var controls routing.
+
 **CLI:**
 
 ```bash
@@ -87,9 +105,10 @@ pytest tests/unit tests/llm tests/integration tests/web -q
 All tests run offline — the browser-integration suite drives real Chromium against local
 HTML fixtures under `tests/integration/fixtures/`, never a live third-party site, so the
 suite doesn't depend on any external service being reachable. As of this writing all
-tests pass (63 tests: config, LLM adapters, browser snapshotting, action dispatch,
-artifact logging incl. secret redaction, run throttling, the full agent loop, the web
-API, presets, and the CLI).
+tests pass (78 tests: config incl. OpenAI-compatible endpoint overrides, LLM adapters,
+browser snapshotting, action dispatch, artifact logging incl. secret redaction, run
+throttling incl. bring-your-own-key, the full agent loop incl. an unexpected-error safety
+net, the web API, presets, and the CLI).
 
 ## Key assumptions
 

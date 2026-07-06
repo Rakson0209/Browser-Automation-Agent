@@ -196,6 +196,32 @@ storage or any artifact.
 
 ---
 
+## Phase 8: OpenAI-Compatible Endpoint Override (Follow-up Enhancement)
+
+**Purpose**: Let `LLM_PROVIDER=openai` target any OpenAI-compatible API (DeepSeek,
+Together.ai, a local vLLM server, ...) via a base-URL override, without adding a new
+provider value or touching the neutral abstraction (Principle IV already covers this —
+it's the same wire format, just a different host).
+
+- [X] T064 [P] Add optional `openai_base_url` to `Configuration` (env `OPENAI_BASE_URL`,
+  defaults to `None` → OpenAI's own endpoint) in `app/config.py`
+- [X] T065 Pass `base_url=config.openai_base_url` through to the OpenAI SDK client in
+  `LLMClient._sdk()`, in `app/agent/llm.py`
+- [X] T066 [P] Unit tests for the config default/override and an `LLMClient` test
+  confirming the SDK client actually receives the custom base URL, in
+  `tests/unit/test_config.py` and `tests/llm/test_llm_adapters.py`
+- [X] T067 [P] Document `OPENAI_BASE_URL` in `.env.example` and README.md, including that
+  "bring your own key" visitors inherit the operator's configured endpoint (their own key
+  is used against whichever host `OPENAI_PROVIDER` is routed to) and that the web form
+  intentionally does not expose an arbitrary base-URL field (avoids turning the trigger
+  endpoint into an open request proxy)
+
+**Checkpoint**: 78/78 tests passing; `LLM_PROVIDER=openai` + `OPENAI_BASE_URL` +
+`OPENAI_MODEL` lets the whole system run against DeepSeek (or any compatible API) with no
+code changes.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

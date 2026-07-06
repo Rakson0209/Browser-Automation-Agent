@@ -51,3 +51,24 @@ def test_custom_limits_are_parsed_as_int():
     )
     assert cfg.daily_run_limit == 5
     assert cfg.max_steps_per_run == 8
+
+
+def test_openai_base_url_defaults_to_none():
+    cfg = load_config({"LLM_PROVIDER": "openai", "OPENAI_API_KEY": "sk-test"})
+    assert cfg.openai_base_url is None
+
+
+def test_openai_base_url_can_target_an_openai_compatible_endpoint():
+    """e.g. DeepSeek, Together.ai, or a local vLLM server — anything speaking the
+    OpenAI chat-completions wire format can be used under LLM_PROVIDER=openai."""
+    cfg = load_config(
+        {
+            "LLM_PROVIDER": "openai",
+            "OPENAI_API_KEY": "sk-deepseek-test",
+            "OPENAI_BASE_URL": "https://api.deepseek.com",
+            "OPENAI_MODEL": "deepseek-chat",
+        }
+    )
+    assert cfg.openai_base_url == "https://api.deepseek.com"
+    assert cfg.active_model() == "deepseek-chat"
+    assert cfg.is_provider_ready() is True

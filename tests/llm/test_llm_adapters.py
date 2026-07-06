@@ -5,12 +5,14 @@ from app.agent.llm import (
     Action,
     AnthropicAdapter,
     AssistantTurn,
+    LLMClient,
     OpenAIAdapter,
     PageSnapshot,
     ToolResultsTurn,
     UserTurn,
     adapter_for_provider,
 )
+from app.config import load_config
 
 
 def _snapshot(url="https://example.test/"):
@@ -95,3 +97,25 @@ def test_tool_schemas_expose_all_seven_actions():
     expected = {"navigate", "click", "type_text", "scroll", "read_page", "go_back", "finish"}
     assert set(anthropic_schema["properties"]["type"]["enum"]) == expected
     assert set(openai_schema["properties"]["type"]["enum"]) == expected
+
+
+def test_llm_client_passes_custom_base_url_to_openai_sdk():
+    """Confirms an OpenAI-compatible endpoint (e.g. DeepSeek) is actually reachable
+    through LLM_PROVIDER=openai, not just accepted at the config layer."""
+    config = load_config(
+        {
+            "LLM_PROVIDER": "openai",
+            "OPENAI_API_KEY": "sk-deepseek-test",
+            "OPENAI_BASE_URL": "https://api.deepseek.com",
+        }
+    )
+    client = LLMClient(config)
+    sdk_client = client._sdk()
+    assert str(sdk_client.base_url).rstrip("/") == "https://api.deepseek.com"
+
+
+def test_llm_client_uses_openai_default_base_url_when_unset():
+    config = load_config({"LLM_PROVIDER": "openai", "OPENAI_API_KEY": "sk-test"})
+    client = LLMClient(config)
+    sdk_client = client._sdk()
+    assert "api.openai.com" in str(sdk_client.base_url)
