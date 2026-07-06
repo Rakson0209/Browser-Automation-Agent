@@ -1,11 +1,13 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0 (compute-profile constraint added)
+- Version change: 1.1.0 → 1.2.0 (bring-your-own-key allowance added)
 - Modified principles:
-  - VII. Security Boundaries & Resource Throttling — rationale expanded to reference the
-    CPU-only compute profile as an added reason for single-concurrency throttling
-- Added sections: none (new content added within existing "Technology & Platform
-  Constraints" section as a new "Compute profile" bullet)
+  - II. No Secrets, Environment-Only Configuration — loosened from "only via environment
+    variables" to also permit an optional, never-persisted, per-request user-supplied
+    LLM credential ("bring your own key") for web-triggered runs, so a public deployment
+    does not force every visitor to spend the operator's own key/budget. The
+    never-commit/never-log/never-persist-on-server invariant remains NON-NEGOTIABLE.
+- Added sections: none
 - Removed sections: none
 - Templates requiring updates:
   - ✅ .specify/templates/plan-template.md (Constitution Check gate is generic — no edit needed)
@@ -35,14 +37,23 @@ being visible and auditable through commit history, not asserted after the fact.
 
 ### II. No Secrets, Environment-Only Configuration (NON-NEGOTIABLE)
 
-API keys and any other credential MUST be supplied only via environment variables / `.env`
+The operator's own credentials MUST be supplied only via environment variables / `.env`
 (with `.env` excluded from version control) and MUST NEVER be committed, hard-coded, or
-logged. Automation targets are restricted to publicly accessible, no-login pages and
-self-built test pages; the agent MUST NOT attempt to bypass authentication or operate on
-systems requiring login or elevated access.
+logged. As an alternative to the operator's default credential, a web user MAY optionally
+supply their own LLM provider + API key for a single run ("bring your own key"); such a
+key MUST be held only in memory for the duration of that one run, MUST NEVER be persisted
+to disk, a session store, or any log/artifact on the server, and MUST be redacted with the
+same rigor as the operator's own key wherever run output could contain it (Principle V).
+Client-side remembering of a user-supplied key (e.g. browser `sessionStorage`) is
+permitted since it never touches server-side storage. Automation targets are restricted to
+publicly accessible, no-login pages and self-built test pages; the agent MUST NOT attempt
+to bypass authentication or operate on systems requiring login or elevated access.
 
 **Rationale**: The project is graded and deployed publicly; leaked keys or credential-bypass
-behavior are unacceptable security and compliance failures, not stylistic concerns.
+behavior are unacceptable security and compliance failures, not stylistic concerns. A public
+deployment that only ever runs on the operator's own key lets any visitor spend the
+operator's quota/budget — letting a visitor supply their own key removes that exposure
+without weakening the no-persistence guarantee that makes secret handling safe.
 
 ### III. Layered, Test-Gated Development
 
@@ -170,4 +181,4 @@ or materially expanded guidance, PATCH for clarifications and wording fixes.
 after Phase 1 design, and any reviewer of generated plans/tasks MUST verify they do not
 violate Principles II, IV, or V (the NON-NEGOTIABLE items) before approving implementation.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06
+**Version**: 1.2.0 | **Ratified**: 2026-07-06 | **Last Amended**: 2026-07-06
