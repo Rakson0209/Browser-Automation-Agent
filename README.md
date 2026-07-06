@@ -88,8 +88,17 @@ there:
   LLM_PROVIDER=openai
   OPENAI_API_KEY=<your DeepSeek key>
   OPENAI_BASE_URL=https://api.deepseek.com
-  OPENAI_MODEL=deepseek-chat
+  OPENAI_MODEL=deepseek-v4-flash
   ```
+
+> **Note**: DeepSeek is deprecating the `deepseek-chat` / `deepseek-reasoner` model
+> names on 2026-07-24 in favor of `deepseek-v4-flash`; during the transition,
+> `deepseek-chat` is auto-routed to `deepseek-v4-flash` in non-thinking mode. If a
+> DeepSeek call ever returns `400 ... reasoning_content in the thinking mode must be
+> passed back`, that means the response came back in *thinking* (reasoning) mode — the
+> `OpenAIAdapter` already round-trips `reasoning_content` between turns to handle this
+> (`app/agent/llm.py`), so this should only surface as a hard failure if a future
+> DeepSeek response shape changes again.
 - **As a visitor, per-run** — pick "Use my own key" → provider "OpenAI (or an
   OpenAI-compatible API)" → the "DeepSeek" quick preset (or type the base URL/model in
   manually) → paste in a DeepSeek key. No operator configuration needed for this path.

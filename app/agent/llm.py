@@ -66,6 +66,11 @@ class UserTurn:
 class AssistantTurn:
     action: Action
     decision: str
+    provider_extra: Optional[Dict[str, Any]] = None
+    """Opaque, provider-specific data that MUST be round-tripped back to that same
+    provider on the next turn but has no neutral meaning (e.g. DeepSeek's reasoning
+    models require their prior `reasoning_content` to be echoed back in "thinking
+    mode," or the next call is rejected). Anthropic's adapter never populates this."""
 
 
 @dataclass
@@ -260,24 +265,28 @@ class OpenAIAdapter(ProviderAdapter):
         import json
 
         call_id = f"call_{len(messages)}"
-        messages.append(
-            {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": call_id,
-                        "type": "function",
-                        "function": {
-                            "name": _TOOL_NAME,
-                            "arguments": json.dumps(
-                                _tool_input_from_action(turn.action, turn.decision)
-                            ),
-                        },
-                    }
-                ],
-            }
-        )
+        message: Dict[str, Any] = {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": call_id,
+                    "type": "function",
+                    "function": {
+                        "name": _TOOL_NAME,
+                        "arguments": json.dumps(
+                            _tool_input_from_action(turn.action, turn.decision)
+                        ),
+                    },
+                }
+            ],
+        }
+        # DeepSeek's reasoning models (thinking mode) require reasoning_content to be
+        # echoed back verbatim on the next turn or the API rejects the request with
+        # "The reasoning_content in the thinking mode must be passed back to the API."
+        if turn.provider_extra and turn.provider_extra.get("reasoning_content") is not None:
+            message["reasoning_content"] = turn.provider_extra["reasoning_content"]
+        messages.append(message)
         return messages
 
     def append_tool_results_turn(
@@ -306,7 +315,20 @@ class OpenAIAdapter(ProviderAdapter):
         arguments = func.arguments if hasattr(func, "arguments") else func["arguments"]
         tool_input = json.loads(arguments)
         decision = tool_input.get("decision", "")
-        return AssistantTurn(action=_action_from_tool_input(tool_input), decision=decision)
+
+        # DeepSeek-compatible reasoning models attach a non-standard reasoning_content
+        # field to the message; capture it (if present) so it can be echoed back on the
+        # next turn (see append_assistant_turn) — required by DeepSeek's thinking mode.
+        reasoning_content = getattr(message, "reasoning_content", None)
+        if reasoning_content is None and isinstance(message, dict):
+            reasoning_content = message.get("reasoning_content")
+        provider_extra = {"reasoning_content": reasoning_content} if reasoning_content is not None else None
+
+        return AssistantTurn(
+            action=_action_from_tool_input(tool_input),
+            decision=decision,
+            provider_extra=provider_extra,
+        )
 
 
 def adapter_for_provider(provider: str) -> ProviderAdapter:

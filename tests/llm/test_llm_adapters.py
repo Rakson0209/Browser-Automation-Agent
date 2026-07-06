@@ -119,3 +119,54 @@ def test_llm_client_uses_openai_default_base_url_when_unset():
     client = LLMClient(config)
     sdk_client = client._sdk()
     assert "api.openai.com" in str(sdk_client.base_url)
+
+
+def test_openai_adapter_captures_deepseek_reasoning_content_from_response():
+    """DeepSeek's reasoning models (thinking mode) attach a non-standard
+    reasoning_content field to the message; it must be captured so it can be echoed
+    back on the next turn, or DeepSeek rejects the follow-up call with:
+    '400 ... reasoning_content in the thinking mode must be passed back to the API.'
+    """
+    adapter = OpenAIAdapter()
+    arguments = json.dumps({"type": "read_page", "decision": "Thinking it over..."})
+    fake_message = SimpleNamespace(
+        tool_calls=[SimpleNamespace(function=SimpleNamespace(arguments=arguments))],
+        reasoning_content="Let me consider the page contents step by step...",
+    )
+    fake_response = SimpleNamespace(choices=[SimpleNamespace(message=fake_message)])
+
+    parsed = adapter.parse_response(fake_response)
+
+    assert parsed.provider_extra == {
+        "reasoning_content": "Let me consider the page contents step by step..."
+    }
+
+
+def test_openai_adapter_echoes_reasoning_content_back_on_next_turn():
+    adapter = OpenAIAdapter()
+    messages = adapter.build_initial_messages(
+        UserTurn(goal="anything", snapshot=_snapshot())
+    )
+    turn = AssistantTurn(
+        action=Action(type="read_page"),
+        decision="Reading the page",
+        provider_extra={"reasoning_content": "step-by-step reasoning trace"},
+    )
+
+    messages = adapter.append_assistant_turn(messages, turn)
+
+    assert messages[-1]["reasoning_content"] == "step-by-step reasoning trace"
+
+
+def test_openai_adapter_omits_reasoning_content_when_absent():
+    """Plain OpenAI (and non-thinking-mode DeepSeek) responses never set
+    reasoning_content; the resulting message must not include the key at all."""
+    adapter = OpenAIAdapter()
+    messages = adapter.build_initial_messages(
+        UserTurn(goal="anything", snapshot=_snapshot())
+    )
+    turn = AssistantTurn(action=Action(type="read_page"), decision="Reading the page")
+
+    messages = adapter.append_assistant_turn(messages, turn)
+
+    assert "reasoning_content" not in messages[-1]

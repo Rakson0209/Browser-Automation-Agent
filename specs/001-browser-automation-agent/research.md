@@ -22,6 +22,19 @@ go_back/finish) than parsing free-form text. A neutral turn layer is what makes 
 custom parsing/repair logic per provider); a single hard-coded provider (rejected — violates
 Principle IV and constitution's explicit vendor-neutrality requirement).
 
+**Amendment (found via a real DeepSeek deployment failure)**: `AssistantTurn` gained an
+opaque `provider_extra` field. DeepSeek's reasoning-capable models (thinking mode,
+including the `deepseek-v4-flash` model that `deepseek-chat` transitionally routes to)
+attach a non-standard `reasoning_content` field to the assistant message that MUST be
+echoed back verbatim on the next turn, or the API rejects the follow-up call with
+`400 ... reasoning_content in the thinking mode must be passed back to the API`.
+`provider_extra` is a deliberately opaque, provider-specific pass-through bag (the agent
+loop never inspects it) so this kind of vendor quirk can be handled entirely inside
+`OpenAIAdapter` without leaking into the neutral loop — the `AnthropicAdapter` simply never
+populates it. This is the same category of lesson as research.md §5's base-image issue:
+a real integration attempt surfaced a vendor-specific requirement that no amount of
+reading generic API docs would have caught in advance.
+
 ## 2. Element targeting for reliability
 
 **Decision**: On each observation, run a page-injected script that scans visible interactive
