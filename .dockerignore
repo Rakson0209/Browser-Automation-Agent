@@ -1,0 +1,18 @@
+.git/
+.gitignore
+.claude/
+.specify/
+specs/
+Task3 - Browser Automation Agent.pdf
+.env
+.env.local
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+browser_auto_env/
+tests/
+app/runs/
+*.md
+!README.md

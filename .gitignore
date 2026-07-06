@@ -1,1 +1,25 @@
 .claude/settings.local.json
+
+# Secrets — never commit (constitution Principle II)
+.env
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+browser_auto_env/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Runtime run artifacts (ephemeral; seeded sample lives under app/samples/ instead)
+app/runs/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db

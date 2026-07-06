@@ -1,0 +1,11 @@
+playwright>=1.44,<2
+anthropic>=0.30,<1
+openai>=1.30,<2
+fastapi>=0.111,<1
+uvicorn[standard]>=0.29,<1
+jinja2>=3.1,<4
+python-dotenv>=1.0,<2
+python-multipart>=0.0.9,<1
+pytest>=8.2,<9
+pytest-asyncio>=0.23,<1
+httpx>=0.27,<1
