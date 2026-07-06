@@ -115,6 +115,13 @@ name and confirm it runs the same task end-to-end and produces the same artifact
 - What happens when the configured LLM provider has no matching API key set? The system
   MUST refuse to start a new run and report a clear configuration error immediately, rather
   than starting a run that would only fail once execution reaches its first LLM call.
+- What happens when a web user chooses to supply their own LLM provider and API key
+  instead of the server default, but leaves the key blank or picks an unsupported
+  provider? The system MUST reject the request with a clear message before any run is
+  created, the same as a missing server-side key.
+- What happens if a user-supplied key turns out to be invalid/expired and the provider
+  rejects it mid-run? The run MUST end in a clearly labeled failed state with the
+  underlying error surfaced, not stall indefinitely in an in-progress state.
 
 ## Requirements *(mandatory)*
 
@@ -171,6 +178,13 @@ name and confirm it runs the same task end-to-end and produces the same artifact
   dashboard or the CLI — if the configured LLM provider's required API key is not present,
   returning a clear configuration-error message instead of starting a run that would only
   fail once execution reaches its first LLM call.
+- **FR-018**: System MUST allow a web user to optionally supply their own LLM provider and
+  API key ("bring your own key") for a single run instead of the server-configured
+  default. A supplied key MUST be used only in memory for the duration of that one run and
+  MUST NEVER be persisted server-side (disk, session store, or otherwise) or written to any
+  log/report/artifact — it is subject to the same non-fabrication and non-leak guarantees
+  (FR-004, FR-011) as the operator's own key. When a user does not choose to supply their
+  own key, the server-configured default (FR-017) continues to apply unchanged.
 
 ### Key Entities
 
@@ -209,6 +223,10 @@ name and confirm it runs the same task end-to-end and produces the same artifact
   report — verified by automated inspection of artifact contents, not just by code review.
 - **SC-008**: 100% of the automated test suite (covering the areas listed in FR-016) passes
   with zero failures prior to every deployment.
+- **SC-009**: A run triggered with a user-supplied "bring your own key" (FR-018) succeeds
+  or fails independently of whether the server's own default credential is configured, and
+  that key never appears in any artifact produced by the run (verified the same way as
+  SC-007).
 
 ## Assumptions
 
@@ -217,6 +235,10 @@ name and confirm it runs the same task end-to-end and produces the same artifact
   decision, not a user-facing product requirement.
 - Preset/demo tasks target stable, publicly accessible pages chosen for reliability (rather
   than potentially volatile third-party sites), so that demonstrations are reproducible.
+- "Bring your own key" (FR-018) may be remembered client-side (e.g. browser session
+  storage) purely for the visitor's convenience across runs in the same browser tab; this
+  is acceptable because it never touches server-side storage and is out of this system's
+  control once it leaves the server's response.
 - The dashboard itself does not require user accounts or login; access control is limited to
   the daily run-quota and single-concurrency throttling described above. Broader multi-tenant
   access control is out of scope for this feature.

@@ -153,6 +153,49 @@ Single project per [plan.md](./plan.md) Structure Decision: `app/` at repository
 
 ---
 
+## Phase 7: Bring Your Own Key (Follow-up Enhancement, FR-018)
+
+**Purpose**: Let a web visitor supply their own LLM provider + API key for a single run
+instead of the server operator's default, so a public deployment doesn't force every
+visitor to spend the operator's own budget (constitution Principle II amendment, v1.2.0).
+
+- [X] T054 [P] Amend constitution Principle II to permit an optional, never-persisted,
+  per-request user-supplied LLM credential alongside the environment-sourced default, in
+  `.specify/memory/constitution.md` (v1.1.0 → v1.2.0)
+- [X] T055 Extend `RunManager._reserve`/`_make_executor`/`trigger_run`/`trigger_run_background`
+  in `app/runner.py` to accept an optional `override_provider`/`override_api_key`, judge
+  readiness on the override when present, build an ephemeral `Configuration` copy
+  (`dataclasses.replace`) for that run only, and record the *effective* provider on `Run`
+- [X] T056 [P] Unit tests for override acceptance/rejection (unsupported provider, missing
+  key, bypasses server-readiness check, never mutates `self.config`) in
+  `tests/unit/test_runner.py`
+- [X] T057 Harden `run_agent_loop` with a catch-all safety net so an unexpected SDK
+  exception (e.g. an invalid visitor-supplied key triggering an auth error) ends the run
+  `failed` instead of leaving it stuck `in_progress` forever, in `app/agent/agent.py`
+- [X] T058 [P] Integration test for the new safety net in
+  `tests/integration/test_agent_loop_unexpected_error.py`
+- [X] T059 Add `llm_source`/`llm_provider`/`llm_api_key` form fields to `POST /run` in
+  `app/web/server.py`, validating and passing them through to
+  `RunManager.trigger_run_background`, without ever echoing the key back in a response
+- [X] T060 [P] Web tests for the custom-key path (accepted despite server not ready,
+  rejected on missing key/bad provider, default path unaffected) in
+  `tests/web/test_run_trigger.py`
+- [X] T061 Add the default/custom toggle UI (radio buttons, provider select, password
+  input) to `app/web/templates/index.html`, with client-side `sessionStorage` remembering
+  (never sent to the server except at submit time) and a nudge toward "custom" when the
+  server's own provider isn't ready
+- [X] T062 [P] Web tests confirming the toggle UI renders and the "not configured" nudge
+  appears only when the server provider isn't ready, in `tests/web/test_dashboard_home.py`
+- [X] T063 Update spec.md (FR-018, two edge cases, SC-009, an assumption),
+  data-model.md (RunManager/Configuration), and contracts/web-api.md (`POST /run` fields)
+  to reflect this capability
+
+**Checkpoint**: 74/74 tests passing; a visitor can trigger a run with their own key even
+when the server has no default configured, and that key never touches server-side
+storage or any artifact.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

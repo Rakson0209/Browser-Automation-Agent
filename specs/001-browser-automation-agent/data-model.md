@@ -146,9 +146,14 @@ Enforces Principle VII.
 
 **Validation rules**:
 - A new run request MUST be rejected (not queued) whenever `active_run_id` is non-null,
-  `runs_started_today >= daily_run_limit`, or `provider_ready` is `false`, per the spec's
-  edge cases — the `provider_ready` check MUST run before any browser or LLM call is
-  attempted, so a missing key fails fast with a configuration error rather than mid-run.
+  `runs_started_today >= daily_run_limit`, or there is no usable credential (`provider_ready`
+  is `false` AND no per-request override key was supplied), per the spec's edge cases — this
+  check MUST run before any browser or LLM call is attempted, so a missing/invalid key fails
+  fast with a configuration error rather than mid-run.
+- When a per-request override (`override_provider`/`override_api_key`, FR-018) is supplied,
+  readiness is judged on that credential instead of the server's own `Configuration`, and the
+  `Run.provider` recorded is the *effective* provider actually used (override if present,
+  server default otherwise) — never a mix of the two.
 
 ## Configuration (Principle II)
 
@@ -158,6 +163,14 @@ Enforces Principle VII.
 | `anthropic_api_key` / `openai_api_key` | env, only the one matching `llm_provider` is required | Never logged, never committed (Principle II) |
 | `daily_run_limit` | env `DAILY_RUN_LIMIT` | Feeds `RunManager.daily_run_limit` |
 | `max_steps_per_run` | env (implementation default documented in plan, not user-facing) | Enforces FR-008's step-limit-without-success outcome |
+
+**Per-request override (not part of `Configuration`, never persisted)**: a web user MAY
+supply `override_provider` + `override_api_key` with a single `POST /run` request
+("bring your own key", FR-018). These values exist only for the lifetime of that one run's
+execution (held in memory, passed to an ephemeral copy of `Configuration` used only by that
+run's `LLMClient`) and are added to that run's `RunLogger` secret-redaction list the same as
+the server's own key (Principle V, SC-007/SC-009) — they are never written to `self.config`,
+disk, a session store, or any artifact.
 
 ## Entity Relationships
 
